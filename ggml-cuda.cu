@@ -955,7 +955,7 @@ GGML_CALL ggml_backend_buffer_type_t ggml_backend_cuda_split_buffer_type(const f
     return &result.first->second;
 }
 
-// host buffer type
+// host buffer type Half Finished
 
 GGML_CALL static const char * ggml_backend_cuda_host_buffer_type_name(ggml_backend_buffer_type_t buft) {
     return GGML_CUDA_NAME "_Host";
