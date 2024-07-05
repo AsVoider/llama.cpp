@@ -2,7 +2,7 @@
 #include "aclnnop/aclnn_apply_rotary_pos_emb.h"
 #include <iostream>
 #include <vector>
-#include "aclnnRoPE.h"
+#include "aclnn-rope.h"
 #include "common.h"
 
 int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keyShape, std::vector<int64_t>& cosShape, std::vector<int64_t>& sinShape, 

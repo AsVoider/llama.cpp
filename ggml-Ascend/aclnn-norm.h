@@ -2,6 +2,7 @@
 #define NORM_H
 
 #include <iostream>
+#include "common.h"
 #include <vector>
 
 
@@ -14,7 +15,7 @@ int aclnnGroupNormFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& ga
 void aclnnGroupNormTest();
 
 int aclnnRmsNormFunc( std::vector<int64_t>& xShape, std::vector<int64_t>& gammaShape, std::vector<int64_t>& yShape, std::vector<int64_t>& rstdShape,
-  std::vector<float>& xHostData, std::vector<float>& gammaHostData, std::vector<float>& yHostData, std::vector<float>& rstdHostData, float epsilon);
+  std::vector<float>& xHostData, std::vector<float>& gammaHostData, std::vector<float>& yHostData, std::vector<float>& rstdHostData, float epsilon, float* dst, aclrtContext &context, aclrtStream &stream);
 
 void aclnnRmsNormTest();
 

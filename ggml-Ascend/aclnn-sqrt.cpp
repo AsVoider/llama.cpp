@@ -3,7 +3,7 @@
 #include <algorithm>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_sqrt.h"
-#include "aclnnSqrt.h"
+#include "aclnn-sqrt.h"
 #include "common.h"
 
 int aclnnSqrtFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst){

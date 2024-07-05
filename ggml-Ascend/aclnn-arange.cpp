@@ -3,7 +3,7 @@
 #include <math.h>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_arange.h"
-#include "aclnnArange.h"
+#include "aclnn-arange.h"
 #include "common.h"
 
 int aclnnArangeFunc(float startValue, float endValue, float stepValue){
