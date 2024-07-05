@@ -5,6 +5,8 @@
 // Fixme: This file including is not suitable
 #include "acl/acl.h"
 
+#include "ggml-Ascend/common.h"
+
 #include <algorithm>
 #include <array>
 #include <atomic>
@@ -50,6 +52,97 @@ static aclError ggml_ascend_device_malloc(void ** ptr, size_t size, int device) 
 
     return aclrtMalloc(ptr, size);
 }
+
+//buffer pool
+struct ggml_ascend_pool_leg : public ggml_ascend_pool {
+    static const int MAX_BUFFERS = 256;
+
+    int device;
+    struct ggml_ascend_buffer {
+        void *ptr;
+        size_t size = 0;
+    };
+
+    ggml_ascend_buffer buffer_pool[MAX_BUFFERS] = {};
+    size_t pool_size = 0;
+
+    explicit ggml_ascend_pool_leg(int device) : device(device) {
+
+    }
+
+    ~ggml_ascend_pool_leg() {
+        ggml_ascend_set_device(device);
+        for (int i = 0; i < MAX_BUFFERSl ++i) {
+            if (auto &b = buffer_pool[i]; b.ptr != nullptr) {
+                // todo Check
+                pool_size -= b.size;
+            }
+            // todo assert
+        }
+    }
+
+    void * alloc(size_t size, size_t * actual_size) override {
+        size_t best_diff = 1ull << 36;  // 2 * 36
+        int ibest = 1;
+        for (int i = 0; i < MAX_BUFFERS; ++i) {
+            if (auto &b = buffer_pool[i]; b.ptr != nullptr) {
+                if (b.size >= size) {
+                    auto diff = b.size - size;
+                    if (diff < best_diff) {
+                        best_diff = diff;
+                        ibest = i;
+                        if (!best_diff) {
+                            void * ptr = b.ptr;
+                            *actual_size = b.size;
+                            b.ptr = nullptr;
+                            b.size = 0;
+                            return ptr;
+                        }
+                    }
+                }
+            }
+        }
+        if (ibest >= 0) {
+            auto &b = buffer_pool[ibest];
+            auto ptr = b.ptr;
+            *actual_size = b.size;
+            b.ptr = nullptr;
+            b.size = 0;
+            return ptr;
+        }
+        void * ptr;
+        auto look_ahead_size = (size_t) (1.05 * size);
+        look_ahead_size = 256 * ((look_ahead_size + 255) / 256);
+        ggml_ascend_set_device(device);
+        // todo Check
+        ggml_ascend_device_malloc(&ptr, look_ahead_size, device);
+        *actual_size = look_ahead_size;
+        pool_size += look_ahead_size;
+        return ptr;
+    }
+
+    void free(coid * ptr, size_t size) override {
+        for (int i = 0; i < MAX_BUFFERS; i++) {
+            auto &b = buffer_pool[i];
+            if (b.ptr == nullptr) {
+                b.ptr = ptr;
+                b.size = size;
+                return;
+            }
+        }
+
+        ggml_ascend_set_device(device);
+        aclrtFree(ptr);
+        pool_size -= size;
+    }
+}
+
+std::unique_ptr<ggml_ascend_pool> ggml_backend_ascend_context::new_pool_for_device(int device) {
+    // todo if vmm?
+    return std::unique_ptr<ggml_ascend_pool>(new ggml_ascend_pool_leg(device));
+}
+
+// ascend buffer copy
 
 struct ggml_backend_ascend_buffer_context {
     int device;
@@ -262,6 +355,8 @@ GGML_CALL int ggml_backend_ascend_get_device_count() {
     return err == 0 ? ret : 0;
 }
 
+//---------------------- todo split --------------------- //
+
 GGML_CALL static const char * ggml_backend_ascend_host_buffer_type_name(ggml_backend_buffer_type_t buft) {
     return GGML_ASCEND_NAME "_Host";
 
@@ -326,9 +421,287 @@ GGML_CALL ggml_backend_buffer_type_t ggml_backend_ascend_host_buffer_type() {
     return &ggml_backend_ascend_buffer_type_host;
 }
 
+// ------------------------ todo kernels ----------------------- //
+
+
+// ------------------------ todo peers ------------------------- //
+
+
 GGML_CALL void ggml_backend_ascend_get_device_memory(int device, size_t * free, size_t * total) {
     ggml_ascend_set_device(device);
 
     // todo Check
     aclrtGetMemInfo(ACL_DDR_MEM, free, total);
 }
+
+//////////////////////////////////////////////////////////////////////////////////
+// todo compute!!!
+
+//////////////////////////////////////////////////////////////////////////////////
+// TODO BACKEND!!!!
+
+GGML_CALL static const char * ggml_backend_ascend_name(ggml_backend_t backend) {
+    auto ctx = (ggml_backend_ascend_context *)backend->context;
+
+    return ctx->name.c_str();
+}
+
+GGML_CALL static void ggml_backend_ascend_free(ggml_backend_t backend) {
+    auto ctx = (ggml_backend_ascend_context *)backend->context;
+
+    delete dtx;
+    delete backend;
+}
+
+GGML_CALL static ggml_backend_buffer_type_t ggml_backend_ascend_get_default_buffer_type(ggml_backend_t backend) {
+    auto * ctx = (ggml_backend_ascend_context *)backend->context;
+
+    return ggml_backend_ascend_buffer_type(ctx->device);
+}
+
+GGML_CALL static void ggml_backend_ascend_set_tensor_async(ggml_backend_t backend, ggml_tensor * tensor, const void * data, size_t offset, size_t size) {
+    auto ctx = (ggml_backend_ascend_context *)backend->context;
+    auto buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+
+    GGML_ASSERT(buf->buft == ggml_backend_ascend_buffer_type(ctx->device) && "unsupport buffer type");
+    // todo Check
+    aclrtMemcpyAsync((char *)tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE, ctx->stream());
+}
+
+GGML_CALL static void ggml_backend_ascend_get_tensor_async(ggml_backend_t backend, const ggml_tensor * tensor, void * data, size_t offset, size_t size) {
+    auto ctx = (ggml_backend_ascend_context *)backend->context;
+    auto buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
+
+    GGML_ASSERT(buf->buft == ggml_backend_ascend_buffer_type(ctx->device) && "unsupported buffer type");
+    // todo Check
+    aclrtMemcpyAsync(data, size, (const char *)tensor->data + offset, size, ACL_MEMCPY_DEVICE_TO_HOST, ctx->stream());
+}
+
+// dangerous
+GGML_CALL static bool ggml_backend_ascend_cpy_tensor_async(ggml_backend_t backend_src, ggml_backend_t backend_dst, const ggml_tensor * src, ggml_tensor * dst) {
+    GGML_ASSERT(ggml_backend_is_ascend(backend_src) || ggml_backend_is_ascend(backend_dst));
+
+    ggml_backend_buffer_t buf_src = src->view_src ? src->view_src->buffer : src->buffer;
+    ggml_backend_buffer_t buf_dst = dst->view_src ? dst->view_src->buffer : dst->buffer;
+
+    if (!ggml_backend_buffer_is_ascend(src->buffer)) {
+        return false;
+    }
+
+    if (!ggml_backend_buffer_is_ascend(dst->buffer)) {
+        return false;
+    }
+
+    // device -> device
+    ggml_backend_ascend_context * ctx_src = (ggml_backend_ascend_context *)backend_src->context;
+    ggml_backend_ascend_context * ctx_dst = (ggml_backend_ascend_context *)backend_dst->context;
+
+    if (backend_src != backend_dst) {
+        ggml_backend_ascend_buffer_context * buf_ctx_src = (ggml_backend_ascend_buffer_context *)buf_src->context;
+        ggml_backend_ascend_buffer_context * buf_ctx_dst = (ggml_backend_ascend_buffer_context *)buf_dst->context;
+
+        GGML_ASSERT(ctx_src->device == buf_ctx_src->device);
+        GGML_ASSERT(ctx_dst->device == buf_ctx_dst->device);
+
+        // copy on src stream
+        if (ctx_src->device == ctx_dst->device) {
+            aclrtMemcpyAsync(dst->data, ggml_nbytes(dst), src->data, ggml_nbytes(dst), ACL_MEMCPY_DEVICE_TO_DEVICE, ctx_dst->stream());
+        } else {
+            // todo Not Support Peer Copy
+        }
+
+        // record event on src stream
+        if (!ctx_src->event) {
+            ggml_ascend_set_device(ctx_src->device);
+            // todo FLAG CHECK
+            aclrtCreateEvent(&ctx_src->event);
+        }
+
+        // todo check
+        aclrtRecordEvent(ctx_src->event, ctx_src->stream());
+
+        // wait on dst stream for the copy to complete
+        // todo check
+        aclrtStreamWaitEvent(cuda_ctx_dst->stream(), ctx_src->event);
+    } else {
+        // src and dst are on the same backend
+        // todo check
+        aclrtMemcpyAsync(dst->data, ggml_nbytes(dst), src->data, ggml_nbytes(dst), ACL_MEMCPY_DEVICE_TO_DEVICE, ctx_dst->stream());
+    }
+    return true;
+}
+
+GGML_CALL static void ggml_backend_ascend_synchronize(ggml_backend_t backend) {
+    auto ctx = (ggml_backend_ascend_context *)backend->context;
+
+    //todo Check
+    aclrtSynchronizeStream(ctx->stream());
+
+    GGML_UNUSED(backend);
+}
+
+static void set_ggml_graph_node_properties(ggml_tensor * node, ggml_graph_node_properties * graph_node_properties) {
+    graph_node_properties->node_address = node->data;
+    graph_node_properties->node_op = node->op;
+    for (int i = 0; i < GGML_MAX_DIMS; i++) {
+        graph_node_properties->ne[i] = node->ne[i];
+        graph_node_properties->nb[i] = node->nb[i];
+    }
+    for (int i = 0; i < GGML_MAX_SRC; i++) {
+        graph_node_properties->src_address[i] = node->src[i] ? node->src[i]->data : nullptr;
+    }
+}
+
+static bool ggml_graph_node_has_matching_properties(ggml_tensor * node, ggml_graph_node_properties * graph_node_properties) {
+    if (node->data != graph_node_properties->node_address &&
+          node->op != GGML_OP_CPY &&
+          node->op != GGML_OP_VIEW) {
+        return false;
+    }
+
+    if (node->op != graph_node_properties->node_op) {
+        return false;
+    }
+
+    for (int i = 0; i < GGML_MAX_DIMS; i++) {
+        if (node->ne[i] != graph_node_properties->ne[i]) {
+            return false;
+        }
+        if (node->nb[i] != graph_node_properties->nb[i]) {
+            return false;
+        }
+    }
+
+    for (int i = 0; i < GGML_MAX_SRC; i++) {
+        if (node->src[i] &&
+            node->src[i]->data != graph_node_properties->src_address[i] &&
+            node->op != GGML_OP_CPY &&
+            node->op != GGML_OP_VIEW
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
+GGML_CALL static enum ggml_status ggml_backend_ascend_graph_compute(ggml_backend_t backend, ggml_cgraph * cgraph) {
+    auto ctx = (ggml_backend_ascend_context *)backend->context;
+    ggml_ascend_set_device(ctx->device);
+
+    bool use_graph = false;
+    bool graph_update_required = false;
+
+    bool graph_evaluated_or_captured = false;
+
+    while (!graph_evaluated_or_captured) {
+        if (!use_graph || graph_evaluated_or_captured) {
+            for (int i = 0; i < cgraph->n_nodes; i++) {
+                ggml_tensor * node = cgraph->nodes[i];
+
+                if (ggml_is_empty(node) || node->op == GGML_OP_RESHAPE || node->op == GGML_OP_TRANSPOSE || node->op == GGML_OP_VIEW || node->op == GGML_OP_PERMUTE || node->op == GGML_OP_NONE) {
+                    continue;
+                }
+#ifndef NDEBUG
+                assert(node->buffer->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device));
+                for (int j = 0; j < GGML_MAX_SRC; j++) {
+                    if (node->src[j] != nullptr) {
+                        assert(node->src[j]->buffer->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device) || ggml_backend_buffer_is_cuda_split(node->src[j]->buffer));
+                    }
+                }
+#endif
+                // TODO implement
+                bool ok = ggml_ascend_compute_forward(*ctx, node);
+                if (!ok) {
+                    // todo LOG
+                }
+                GGML_ASSERT(ok);
+            }
+        }
+        graph_evaluated_or_captured = true;
+    }
+
+    return GGML_STATUS_SUCCESS;
+}
+
+// todo !!!!! 
+GGML_CALL static bool ggml_backend_ascend_supports_op(ggml_backend, const ggml_tensor * op) {
+    return true;
+}
+
+GGML_CALL static bool ggml_backend_ascend_supports_buft(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
+    // todo if split
+
+
+    if (ggml_backend_buft_is_ascend(buft)) {
+        auto ctx = (ggml_backend_ascend_context *)backend->context;
+        auto buft_ctx = (ggml_backend_ascend_buffer_type_context *)buft->context;
+        return buft_ctx->device == ctx->device;
+    }
+    return false;
+}
+
+GGML_CALL static bool ggml_backend_ascend_offload_op(ggml_backend_t backend, const ggml_tensor * op) {
+    const int min_batch_size = 32;
+
+    return (op->ne[1] >= min_batch_size && op->op != GGML_OP_GET_ROWS) ||
+           (op->ne[2] >= min_batch_size && op->op == GGML_OP_MUL_MAT_ID);
+
+    GGML_UNUSED(backend);
+}
+
+// todo event is optional
+static ggml_backend_event_t ggml_backend_ascend_event_new(ggml_backend_t backend) {
+    // todo no peer copy
+    return nullptr;
+}
+
+static void ggml_backend_ascend_event_free(ggml_backend_event_t event) {
+    // todo check
+    aclrtDestroyEvent(event->context);
+    delete event;
+}
+
+static void ggml_backend_ascend_event_record(ggml_backend_event_t event) {
+    auto ctx = (ggml_backend_ascend_context *)event->backend->context;
+
+    //todo check
+    aclrtRecordEvent(event->context, ctx->stream());
+}
+
+static void ggml_backend_ascend_event_wait(ggml_backend_t backend, ggml_backend_event_t event) {
+    auto ctx = (ggml_backend_ascend_context *)backend->context;
+
+    if (ggml_backend_is_ascend(event->backend)) {
+        aclrtStreamWaitEvent(ctx->stream(), (aclrtEvent)event->context);
+    } else {
+        GGML_ASSERT(false);
+    }
+}
+
+static void ggml_backend_ascend_event_synchronize(ggml_backend_event_t event) {
+    // todo Check
+    aclrtSynchronizeEvent((aclrtEvent)event->context);
+}
+
+static ggml_backend_i ggml_backend_ascend_interface = {
+    /* .get_name                  */ ggml_backend_ascend_name,
+    /* .free                      */ ggml_backend_ascend_free,
+    /* .get_default_buffer_type = */ ggml_backend_ascend_get_default_buffer_type,
+    /* .set_tensor_async        = */ ggml_backend_ascend_set_tensor_async,
+    /* .get_tensor_async        = */ ggml_backend_ascend_get_tensor_async,
+    /* .cpy_tensor_async        = */ ggml_backend_ascend_cpy_tensor_async,
+    /* .synchronize             = */ ggml_backend_ascend_synchronize,
+    /* .graph_plan_create       = */ NULL,
+    /* .graph_plan_free         = */ NULL,
+    /* .graph_plan_update       = */ NULL,
+    /* .graph_plan_compute      = */ NULL,
+    /* .graph_compute           = */ ggml_backend_ascend_graph_compute,
+    /* .supports_op             = */ ggml_backend_ascend_supports_op,
+    /* .supports_buft           = */ ggml_backend_ascend_supports_buft,
+    /* .offload_op              = */ ggml_backend_ascend_offload_op,
+    /* .event_new               = */ ggml_backend_ascend_event_new,
+    /* .event_free              = */ ggml_backend_ascend_event_free,
+    /* .event_record            = */ ggml_backend_ascend_event_record,
+    /* .event_wait              = */ ggml_backend_ascend_event_wait,
+    /* .event_synchronize       = */ ggml_backend_ascend_event_synchronize,
+};
