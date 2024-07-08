@@ -29,6 +29,7 @@ add_executable(test
         aclnn-clamp.cpp
         aclnn-leaky.cpp
         aclnn-im2col.cpp
+        aclnn-cpy.cpp
         aclnn-rope.cpp
         aclnn-sqrt.cpp
         aclnn-unary.cpp

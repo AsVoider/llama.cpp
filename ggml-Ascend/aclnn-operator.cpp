@@ -10,6 +10,7 @@
 #include "aclnn-clamp.h"
 #include "aclnn-add.h"
 #include "aclnn-norm.h"
+#include "aclnn-cpy.h"
 #include "aclnn-comp.h"
 
 void aclnnSiluCompute(int64_t* ne, float* data, float* dst, aclrtContext &context, aclrtStream &stream){
@@ -75,6 +76,25 @@ void aclnnMulsCompute(int64_t* ne1, int64_t* ne2,float* data1, float* data2, flo
   };
   std::vector<float> outHostData(outShape[0]*outShape[1]*outShape[2]*outShape[3], 0);
   int ret = aclnnMulFunc(selfShape, otherShape, outShape, selfHostData, otherHostData, outHostData, dst, context, stream);
+}
+
+void aclnnCpyCompute(int64_t* ne1, int64_t* ne2,float* data, float* dst, aclrtContext &context, aclrtStream &stream){
+  std::vector<int64_t> srcShape = {ne1[3], ne1[2], ne1[1], ne1[0]};
+  std::vector<int64_t> selfRefShape = {ne2[3], ne2[2], ne2[1], ne2[0]};
+  std::vector<float> selfRefHostData(dst, dst + ne2[3]*ne2[2]*ne2[1]*ne2[0]);
+  std::vector<float> srcHostData(data, data+ ne1[3]*ne1[2]*ne1[1]*ne1[0]);
+  int ret = aclnnCpyFunc(selfRefShape, srcShape, selfRefHostData, srcHostData, dst, context, stream);
+}
+
+void aclnnGetRowsCompute(float* dst ,aclrtContext &context, aclrtStream &stream){
+  std::vector<int64_t> selfShape = {4, 2};
+  std::vector<int64_t> indexShape = {2};
+  std::vector<int64_t> outShape = {2, 2};
+  int64_t dim = 0;
+  std::vector<float> selfHostData = {0, 1, 2, 3, 4, 5, 6, 7};
+  std::vector<int> indexHostData = {1, 0};
+  std::vector<float> outHostData = {0, 0, 0, 0, 0, 0, 0, 0};
+  int ret = aclnnGetRowsFunc(selfShape, indexShape, outShape, dim, selfHostData, indexHostData, outHostData, dst, context, stream);
 }
 
 ///not for usage today 

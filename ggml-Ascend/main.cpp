@@ -11,9 +11,9 @@
 int main() {
 
   int64_t ne1[4] = {1, 1, 1, 32};
-  int64_t ne2[4] = {1, 1, 16, 1};
+  int64_t ne2[4] = {1, 1, 1, 32};
   float a[32] = {0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
-  float aa[16] = {0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
+  float aa[32] = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2};
   float b[32];
   float pa[5] = {1.0, 8.0};
   auto start = std::chrono::high_resolution_clock::now();
@@ -25,7 +25,7 @@ int main() {
   auto ret = Init(deviceId, &context, &stream);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
 
-  aclnnAddCompute(ne1, ne2, a, aa, b, context, stream);
+  aclnnCpyCompute(ne1, ne2, a, b, context, stream);
 
   auto end = std::chrono::high_resolution_clock::now();
   auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
