@@ -2,7 +2,7 @@
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_clamp.h"
-#include "aclnnClamp.h"
+#include "aclnn-clamp.h"
 #include "common.h"
 
 int aclnnClampFunc(std::vector<int64_t>& shape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float max_v, float min_v ){

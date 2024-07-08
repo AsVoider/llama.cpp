@@ -5,24 +5,16 @@
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_add.h"
-#include "aclnnAdd.h"
+#include "aclnn-add.h"
 #include "common.h"
 
 
-int aclnnAddFunc(std::vector<float>& selfHostData,std::vector<float>& otherHostData, float alphaValue, std::vector<int64_t>& selfShape, std::vector<int64_t>& otherShape, std::vector<int64_t>& outShape){
+int aclnnAddFunc(std::vector<float>& selfHostData,std::vector<float>& otherHostData, float alphaValue, std::vector<int64_t>& selfShape, std::vector<int64_t>& otherShape, std::vector<int64_t>& outShape,float* dst, aclrtContext &context, aclrtStream &stream){
 
   size_t length = selfHostData.size();
   std::vector<float> outHostData(length, 0);
   std::vector<float> errorRet(1, 0);
 
-
-  // 1. （固定写法）device/context/stream初始化，参考AscendCL对外接口列表
-  // 根据自己的实际device填写deviceId
-  int32_t deviceId = 0;
-  aclrtContext context;
-  aclrtStream stream;
-  auto ret = Init(deviceId, &context, &stream);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); errorRet[0] = static_cast<float>(ret); return ret);
 
   // 2. 构造输入与输出，需要根据API的接口自定义构造
 
@@ -35,7 +27,7 @@ int aclnnAddFunc(std::vector<float>& selfHostData,std::vector<float>& otherHostD
   aclTensor* out = nullptr;
 
   // 创建self aclTensor
-  ret = CreateAclTensor(selfHostData, selfShape, &selfDeviceAddr, aclDataType::ACL_FLOAT, &self);
+  auto ret = CreateAclTensor(selfHostData, selfShape, &selfDeviceAddr, aclDataType::ACL_FLOAT, &self);
   CHECK_RET(ret == ACL_SUCCESS, errorRet[0] = static_cast<float>(ret); return ret);
   // 创建other aclTensor
   ret = CreateAclTensor(otherHostData, otherShape, &otherDeviceAddr, aclDataType::ACL_FLOAT, &other);
@@ -79,7 +71,7 @@ int aclnnAddFunc(std::vector<float>& selfHostData,std::vector<float>& otherHostD
     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
   }
 
-
+  std::copy(resultData.data(), resultData.data() + resultData.size(), dst);
 
   // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
   aclDestroyTensor(self);
@@ -94,11 +86,6 @@ int aclnnAddFunc(std::vector<float>& selfHostData,std::vector<float>& otherHostD
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
   }
-  aclrtDestroyStream(stream);
-  aclrtDestroyContext(context);
-  aclrtResetDevice(deviceId);
-  aclFinalize();
-
   return 0;
 }
 
@@ -111,6 +98,6 @@ void aclnnAddTest(){
   std::vector<int64_t> selfShape = {len, width};
   std::vector<int64_t> otherShape = {len, width};
   std::vector<int64_t> outShape = {len, width};
-  int res = aclnnAddFunc(selfHostData, otherHostData, alphaValue, selfShape, otherShape, outShape);
+  //int res = aclnnAddFunc(selfHostData, otherHostData, alphaValue, selfShape, otherShape, outShape);
 }
 

@@ -3,6 +3,7 @@
 #include <vector>
 #include "acl/acl.h"
 #include "common.h"
+#include "aclnn-div.h"
 #include "aclnnop/aclnn_div.h"
 
 

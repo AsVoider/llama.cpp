@@ -3,7 +3,7 @@
 #include <vector>
 #include "acl/acl.h"
 #include "common.h"
-#include "aclnnSort.h"
+#include "aclnn-sort.h"
 #include "aclnnop/aclnn_argsort.h"
 
 int aclnnArgSortFunc(int64_t dim ,bool descending, std::vector<int64_t>& selfShape, std::vector<int64_t>& outIndicesShape, std::vector<int64_t>& selfHostData, std::vector<int64_t>& outIndicesHostData){

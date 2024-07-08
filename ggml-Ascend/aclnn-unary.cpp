@@ -3,7 +3,7 @@
 #include "acl/acl.h"
 #include "aclnnop/aclnn_sigmoid.h"
 #include "aclnnop/aclnn_hardsigmoid.h"
-#include "aclnnUnary.h"
+#include "aclnn-unary.h"
 #include "aclnnop/aclnn_silu.h"
 #include "aclnnop/aclnn_relu.h"
 #include "aclnnop/aclnn_gelu.h"
@@ -217,22 +217,15 @@ int aclnnGeluFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShap
   return 0;
 }
 
-int aclnnSiluFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst){
-    // 1. （固定写法）device/context/stream初始化, 参考AscendCL对外接口列表
-  // 根据自己的实际device填写deviceId
-  int32_t deviceId = 0;
-  aclrtContext context;
-  aclrtStream stream;
-  auto ret = Init(deviceId, &context, &stream);
-  // check根据自己的需要处理
-  CHECK_RET(ret == 0, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
+int aclnnSiluFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream){
+
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfDeviceAddr = nullptr;
   void* outDeviceAddr = nullptr;
   aclTensor* self = nullptr;
   aclTensor* out = nullptr;
   // 创建self aclTensor
-  ret = CreateAclTensor(selfHostData, selfShape, &selfDeviceAddr, aclDataType::ACL_FLOAT, &self);
+  int ret = CreateAclTensor(selfHostData, selfShape, &selfDeviceAddr, aclDataType::ACL_FLOAT, &self);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   // 创建out aclTensor
   ret = CreateAclTensor(outHostData, outShape, &outDeviceAddr, aclDataType::ACL_FLOAT, &out);
@@ -276,10 +269,6 @@ int aclnnSiluFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShap
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
   }
-  aclrtDestroyStream(stream);
-  aclrtDestroyContext(context);
-  aclrtResetDevice(deviceId);
-  aclFinalize();
   return 0;
 }
 

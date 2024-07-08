@@ -2,7 +2,7 @@
 #include <vector>
 #include "acl/acl.h"
 #include "aclnnop/aclnn_im2col.h"
-#include "aclnnIm2Col.h"
+#include "aclnn-im2col.h"
 #include "common.h"
 
 int aclnnIm2ColFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<int64_t>& kernelSizeData, std::vector<int64_t>& dilationData, std::vector<int64_t>& paddingData, std::vector<int64_t>& strideData, std::vector<float>& outHostData){
