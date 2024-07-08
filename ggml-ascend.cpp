@@ -27,6 +27,56 @@
 
 #define MATRIX_ROW_PADDING 512
 
+static void ggml_ascend_default_log_callback(enum ggml_log_level level, const char * msg, void * user_data) {
+    GGML_UNUSED(level);
+    GGML_UNUSED(user_data);
+    fprintf("stderr", "%s", msg);
+}
+
+ggml_log_callback ggml_ascend_log_callback = ggml_ascend_default_log_callback;
+void * ggml_ascend_log_user_data = NULL;
+
+GGML_API void ggml_backend_ascend_log_set_callback(ggml_log_callback log_callback, void * user_data) {
+    ggml_ascend_log_callback = log_callback;
+    ggml_ascend_log_user_data = user_data;
+}
+
+#define GGML_ASCEND_LOG_INFO(...) ggml_ascend_log(GGML_LOG_LEVEL_INFO, __VA_ARGS__)
+#define GGML_ASCEND_LOG_WARN(...) ggml_ascend_log(GGML_LOG_LEVEL_WARN, __VA_ARGS__)
+#define GGML_ASCEND_LOG_ERROR(...) ggml_ascend_log(GGML_LOG_LEVEL_ERROR, __VA_ARGS__)
+
+GGML_ATTRIBUTE_FORMAT(2, 3)
+static void ggml_ascend_log(enum ggml_log_level level, const char * format, ...) {
+    if (ggml_ascend_log_callback != NULL) {
+        va_list args;
+        va_start(args, format);
+        char buffer[128];
+        int len = vsnprintf(buffer, 128, format, args);
+        if (len < 128) {
+            ggml_ascend_log_callback(level, buffer, ggml_ascend_log_user_data);
+        } else {
+            std::vector<char> buffer2(len + 1);
+            va_end(args);
+            va_start(args, format);
+            vsnprintf(&buffer2[0], buffer2.size(), format, args);
+            ggml_ascend_log_callback(level, buffer2.data(), ggml_ascend_log_user_data);
+        }
+        va_end(args);
+    }
+}
+
+[[noreturn]]
+void ggml_ascend_error(const char * stmt, const char * func, const char * file, int line, const char * msg) {
+    int id = -1;
+    aclrtGetDevice(&id);
+
+    GGML_ASCEND_LOG_ERROR("ASCEND error: %s\n", msg);
+    GGML_ASCEND_LOG_ERROR("  current device: %d, in function %s at %s:%d\n", id, func, file, line);
+    GGML_ASCEND_LOG_ERROR("  %s\n", stmt);
+
+    GGML_ASSERT(!"ASCEND error");
+}
+
 void ggml_ascend_set_device(int device) {
     int current_device;
     // todo Check
@@ -130,7 +180,7 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
                 return;
             }
         }
-
+        GGML_ASCEND_LOG_WARN("ASCEND buffer pool full, increase MAX_BUFFERS\n");
         ggml_ascend_set_device(device);
         aclrtFree(ptr);
         pool_size -= size;
