@@ -19,10 +19,12 @@
 #include "ggml-Ascend/aclnn-rope.h"
 #include "ggml-Ascend/aclnn-sort.h"
 #include "ggml-Ascend/aclnn-unary.h"
+#include "ggml-Ascend/aclnn-compute.h"
 
 #include <algorithm>
 #include <array>
 #include <atomic>
+#include <cassert>
 #include <cinttypes>
 #include <cstddef>
 #include <cstdint>
@@ -182,10 +184,10 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
         void * ptr;
         auto look_ahead_size = (size_t) (1.05 * size);
         look_ahead_size = 256 * ((look_ahead_size + 255) / 256);
-        auto ret = ggml_ascend_set_device(device);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl set device failed at [pool_leg malloc]: %d\n", ret); return nullptr);
+        ggml_ascend_set_device(device);
         // todo Check: fixed
-        ggml_ascend_device_malloc(&ptr, look_ahead_size, device);
+        auto ret = ggml_ascend_device_malloc(&ptr, look_ahead_size, device);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl device malloc failed at [pool_leg malloc]: %d\n", ret); return nullptr);
         *actual_size = look_ahead_size;
         pool_size += look_ahead_size;
         return ptr;
@@ -525,16 +527,55 @@ static bool ggml_ascend_compute_forward(ggml_backend_ascend_context & ctx, struc
     // mark: no peer access
     switch (dst->op) {
         case GGML_OP_GET_ROWS:
-            // ggml_ascend_get_rows(ctx, dst); // not implemented
+            ggml_ascend_get_rows(ctx, dst);
             break;
         case GGML_OP_DUP:
-            // ggml_ascend_cpy(ctx, dst);
+            ggml_ascend_dup(ctx, dst);
             break;
-        case GGML_OP
+        case GGML_OP_CPY:
+            ggml_ascend_cpy(ctx, dst->src[0], dst->src[1]);
+            break;
+        case GGML_OP_CONT:
+            ggml_ascend_dup(ctx, dst);
+            break;
+        case GGML_OP_ADD:
+            ggml_ascend_add(ctx, dst);
+            break;
+        case GGML_OP_MUL:
+            ggml_ascend_mul(ctx, dst);
+            break;
+        case GGML_OP_UNARY:
+            switch (ggml_get_unary_op(dst)) {
+                case GGML_UNARY_OP_SILU:
+                    ggml_ascend_silu(ctx, dst);
+                    break;
+                default:
+                    return false;
+            }   
+            break;
+        case GGML_OP_RMS_NORM:
+            ggml_ascend_rms_norm(ctx, dst);
+            break;
+        case GGML_OP_MUL_MAT:
+            if (dst->src[0]->ne[3] != dst->src[1]->ne[3]) {
+                GGML_ASCEND_LOG_ERROR("%s: cannot compute %s: src0->ne[3] = %" PRId64 ", src1->ne[3] = %" PRId64 " - fallback to CPU\n", __func__, dst->name, dst->src[0]->ne[3], dst->src[1]->ne[3]);
+                return false;
+            } else {
+                ggml_ascend_mul_mat(ctx, dst->src[0], dst->src[1], dst);
+            }
+            break;
+        case GGML_OP_SOFT_MAX:
+            ggml_ascend_soft_max(ctx, dst);
+            break;
+        case GGML_OP_ROPE:
+            ggml_ascend_rope(ctx, dst);
+            break;
+        default:
+            return false;
     }
-}
 
-static 
+    return true;
+}
 
 //////////////////////////////////////////////////////////////////////////////////
 // TODO BACKEND!!!!
