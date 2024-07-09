@@ -43,7 +43,7 @@
 static void ggml_ascend_default_log_callback(enum ggml_log_level level, const char * msg, void * user_data) {
     GGML_UNUSED(level);
     GGML_UNUSED(user_data);
-    fprintf("stderr", "%s", msg);
+    fprintf(stderr, "%s", msg);
 }
 
 ggml_log_callback ggml_ascend_log_callback = ggml_ascend_default_log_callback;
@@ -109,14 +109,14 @@ int ggml_ascend_get_device() {
     int id;
     // todo check: fixed
     auto ret = aclrtGetDevice(&id);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_get_device]: %d\n", ret); return);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_get_device]: %d\n", ret); return -1);
     return id;
 }
 
 static aclError ggml_ascend_device_malloc(void ** ptr, size_t size, int device) {
     ggml_ascend_set_device(device);
 
-    return aclrtMalloc(ptr, size);
+    return aclrtMalloc(ptr, size, ACL_MEM_MALLOC_HUGE_FIRST);
 }
 
 //buffer pool
@@ -138,7 +138,7 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
 
     ~ggml_ascend_pool_leg() {
         ggml_ascend_set_device(device);
-        for (int i = 0; i < MAX_BUFFERSl ++i) {
+        for (int i = 0; i < MAX_BUFFERS; ++i) {
             if (auto &b = buffer_pool[i]; b.ptr != nullptr) {
                 // todo Check: fixed
                 auto ret = aclrtFree(b.ptr);
@@ -191,7 +191,7 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
         return ptr;
     }
 
-    void free(coid * ptr, size_t size) override {
+    void free(void * ptr, size_t size) override {
         for (int i = 0; i < MAX_BUFFERS; i++) {
             auto &b = buffer_pool[i];
             if (b.ptr == nullptr) {
@@ -231,7 +231,7 @@ struct ggml_backend_ascend_buffer_context {
         auto ret = aclrtFree(dev_ptr);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl free failed at [~ggml_backend_ascend_buffer_context]: %d\n", ret); return);
     }
-} 
+};
 
 GGML_CALL static const char * ggml_backend_ascend_buffer_get_name(ggml_backend_buffer_t buffer) {
     ggml_backend_ascend_buffer_context * ctx = (ggml_backend_ascend_buffer_context *)buffer->context;
@@ -289,10 +289,10 @@ GGML_CALL static void ggml_backend_ascend_buffer_get_tensor(ggml_backend_buffer_
     ggml_ascend_set_device(ctx->device);
     //todo Check: fixed
     auto ret = aclrtMemcpy(data, size, (const char *)tensor->data + offset, size, ACL_MEMCPY_DEVICE_TO_HOST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpy failed at [ggml_backend_ascend_buffer_get_tensor]: %d\n"); return);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpy failed at [ggml_backend_ascend_buffer_get_tensor]: %d\n", ret); return);
 }
 
-GGML_CALL static bool ggml_backend_ascend_buffer_cpy_tensor(ggml_bcakend_buffer_t buffer, const ggml_tensor * src, ggml_tensor * dst) {
+GGML_CALL static bool ggml_backend_ascend_buffer_cpy_tensor(ggml_backend_buffer_t buffer, const ggml_tensor * src, ggml_tensor * dst) {
     if (ggml_backend_buffer_is_ascend(src->buffer)) {
         auto src_ctx = (ggml_backend_ascend_buffer_context *)src->buffer->context;
         auto dst_ctx = (ggml_backend_ascend_buffer_context *)dst->buffer->context;
@@ -319,7 +319,7 @@ GGML_CALL static void ggml_backend_ascend_buffer_clear(ggml_backend_buffer_t buf
     // todo Check: fixed
     auto ret = aclrtSynchronizeDevice();
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl sync1 failed at [ggml_backend_ascend_buffer_clear]: %d\n", ret); return);
-    ret = aclrtMemset(ctx->dev_ptr, value, buffer->size);
+    ret = aclrtMemset(ctx->dev_ptr, buffer->size, value, buffer->size);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memset failed at [ggml_backend_ascend_buffer_clear]: %d\n", ret); return);
     ret = aclrtSynchronizeDevice();
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl sync2 failed at [ggml_backend_ascend_buffer_clear]: %d\n", ret); return);
@@ -340,7 +340,7 @@ static ggml_backend_buffer_i ggml_backend_ascend_buffer_interface = {
 struct ggml_backend_ascend_buffer_type_context {
     int device;
     std::string name;
-}
+};
 
 GGML_CALL static const char * ggml_backend_ascend_buffer_type_name(ggml_backend_buffer_type_t buft) {
     auto ctx = (ggml_backend_ascend_buffer_type_context *)buft->context;
@@ -424,7 +424,7 @@ GGML_CALL ggml_backend_buffer_type_t ggml_backend_ascend_buffer_type(int device)
                 // todo implement！！！！！！！！！ fixed
             };
         }
-        ggml_backend_ascend_buffer_type = true;
+        ggml_backend_ascend_buffer_type_initialized = true;
     }
 
     return &ggml_backend_ascend_buffer_types[device];
@@ -534,6 +534,8 @@ static bool ggml_ascend_compute_forward(ggml_backend_ascend_context & ctx, struc
     }
 }
 
+static 
+
 //////////////////////////////////////////////////////////////////////////////////
 // TODO BACKEND!!!!
 
@@ -546,7 +548,7 @@ GGML_CALL static const char * ggml_backend_ascend_name(ggml_backend_t backend) {
 GGML_CALL static void ggml_backend_ascend_free(ggml_backend_t backend) {
     auto ctx = (ggml_backend_ascend_context *)backend->context;
 
-    delete dtx;
+    delete ctx;
     delete backend;
 }
 
@@ -625,7 +627,7 @@ GGML_CALL static bool ggml_backend_ascend_cpy_tensor_async(ggml_backend_t backen
 
         // wait on dst stream for the copy to complete
         // todo check: fixed
-        ret = aclrtStreamWaitEvent(cuda_ctx_dst->stream(), ctx_src->event);
+        ret = aclrtStreamWaitEvent(ctx_dst->stream(), ctx_src->event);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl stream wait event failed at [ggml_backend_ascend_cpy_tensor_async]: %d\n", ret); return false);
     } else {
         // src and dst are on the same backend
@@ -708,10 +710,10 @@ GGML_CALL static enum ggml_status ggml_backend_ascend_graph_compute(ggml_backend
                     continue;
                 }
 #ifndef NDEBUG
-                assert(node->buffer->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device));
+                assert(node->buffer->buft == ggml_backend_ascend_buffer_type(ctx->device));
                 for (int j = 0; j < GGML_MAX_SRC; j++) {
                     if (node->src[j] != nullptr) {
-                        assert(node->src[j]->buffer->buft == ggml_backend_cuda_buffer_type(cuda_ctx->device) || ggml_backend_buffer_is_cuda_split(node->src[j]->buffer));
+                        assert(node->src[j]->buffer->buft == ggml_backend_ascend_buffer_type(ctx->device));
                     }
                 }
 #endif
@@ -730,9 +732,107 @@ GGML_CALL static enum ggml_status ggml_backend_ascend_graph_compute(ggml_backend
     return GGML_STATUS_SUCCESS;
 }
 
-// todo !!!!! marked
-GGML_CALL static bool ggml_backend_ascend_supports_op(ggml_backend, const ggml_tensor * op) {
-    return true;
+// todo !!!!! marked: fixed
+GGML_CALL static bool ggml_backend_ascend_supports_op(ggml_backend_t backend, const ggml_tensor * op) {
+    auto ascend_ctx = (ggml_backend_ascend_context *)backend->context;
+    switch (op->op) {
+    case GGML_OP_UNARY:
+        switch (ggml_get_unary_op(op)) {
+            case GGML_UNARY_OP_SILU:
+                return ggml_is_contiguous(op->src[0]);
+            default:
+                return false;
+        }
+        break;
+    case GGML_OP_MUL_MAT:
+        {
+            struct ggml_tensor * a;
+            struct ggml_tensor * b;
+            if (op->op == GGML_OP_MUL_MAT) {
+                a = op->src[0];
+                b = op->src[1];
+            }
+            if (a->ne[3] != b->ne[3]) {
+                return false;
+            }
+            ggml_type a_type = a->type;
+            if (a_type == GGML_TYPE_IQ2_XXS || a_type == GGML_TYPE_IQ2_XS || a_type == GGML_TYPE_IQ3_XXS ||
+                a_type == GGML_TYPE_IQ1_S   || a_type == GGML_TYPE_IQ4_NL || a_type == GGML_TYPE_IQ3_S   ||
+                a_type == GGML_TYPE_IQ1_M   || a_type == GGML_TYPE_IQ2_S  || a_type == GGML_TYPE_IQ4_XS) {
+                if (b->ne[1] == 1 && ggml_nrows(b) > 1) {
+                    return false;
+                }
+            }
+            return true;
+        } break;
+    case GGML_OP_GET_ROWS:
+        {
+            switch (op->src[0]->type) {
+                case GGML_TYPE_F16:
+                case GGML_TYPE_F32:
+                case GGML_TYPE_Q4_0:
+                case GGML_TYPE_Q4_1:
+                case GGML_TYPE_Q5_0:
+                case GGML_TYPE_Q5_1:
+                case GGML_TYPE_Q8_0:
+                    return true;
+                default:
+                    return false;
+            }
+        } break;
+    case GGML_OP_CPY:
+        {
+            ggml_type src0_type = op->src[0]->type;
+            ggml_type src1_type = op->src[1]->type;
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_F32) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_F16) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q8_0) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q4_0) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q4_1) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q5_0) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_Q5_1) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F32 && src1_type == GGML_TYPE_IQ4_NL) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F16 && src1_type == GGML_TYPE_F16) {
+                return true;
+            }
+            if (src0_type == GGML_TYPE_F16 && src1_type == GGML_TYPE_F32) {
+                 return true;
+            }
+            return false;
+        } break;
+    case GGML_OP_DUP:
+        {
+            ggml_type src0_type = op->src[0]->type;
+            return src0_type != GGML_TYPE_I32 && src0_type != GGML_TYPE_I16;
+        } break;
+    case GGML_OP_ADD:
+    case GGML_OP_RMS_NORM:
+    case GGML_OP_MUL:
+    case GGML_OP_CONT:
+    case GGML_OP_SOFT_MAX:
+        return true;
+    case GGML_OP_ROPE:
+        return ggml_is_contiguous(op->src[0]);
+    default:
+        return false;
+    }
+    GGML_UNUSED(backend);
 }
 
 GGML_CALL static bool ggml_backend_ascend_supports_buft(ggml_backend_t backend, ggml_backend_buffer_type_t buft) {
