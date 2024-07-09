@@ -207,7 +207,7 @@ int main(int argc, char ** argv) {
     std::tie(model, ctx) = llama_init_from_gpt_params(params);
     if (sparams.cfg_scale > 1.f) {
         struct llama_context_params lparams = llama_context_params_from_gpt_params(params);
-        ctx_guidance = llama_new_context_with_model(model, lparams);
+        ctx_guidance = llama_new_context_with_model(model, lparams); // todo
     }
 
     if (model == NULL) {

@@ -2142,24 +2142,24 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
             ggml_cuda_op_repeat(ctx, dst);
             break;
         case GGML_OP_GET_ROWS:
-            ggml_cuda_op_get_rows(ctx, dst);
+            ggml_cuda_op_get_rows(ctx, dst); // todo
             break;
         case GGML_OP_DUP:
-            ggml_cuda_dup(ctx, dst);
+            ggml_cuda_dup(ctx, dst); // todo
             break;
-        case GGML_OP_CPY:
+        case GGML_OP_CPY: // todo
             ggml_cuda_cpy(ctx, dst->src[0], dst->src[1]);
             break;
-        case GGML_OP_CONT:
+        case GGML_OP_CONT: // todo
             ggml_cuda_dup(ctx, dst);
             break;
-        case GGML_OP_ADD:
+        case GGML_OP_ADD: // todo
             ggml_cuda_op_add(ctx, dst);
             break;
         case GGML_OP_ACC:
             ggml_cuda_op_acc(ctx, dst);
             break;
-        case GGML_OP_MUL:
+        case GGML_OP_MUL: // todo
             ggml_cuda_op_mul(ctx, dst);
             break;
         case GGML_OP_DIV:
@@ -2170,7 +2170,7 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
                 case GGML_UNARY_OP_GELU:
                     ggml_cuda_op_gelu(ctx, dst);
                     break;
-                case GGML_UNARY_OP_SILU:
+                case GGML_UNARY_OP_SILU: // todo
                     ggml_cuda_op_silu(ctx, dst);
                     break;
                 case GGML_UNARY_OP_GELU_QUICK:
@@ -2220,9 +2220,9 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
             ggml_cuda_op_leaky_relu(ctx, dst);
             break;
         case GGML_OP_RMS_NORM:
-            ggml_cuda_op_rms_norm(ctx, dst);
+            ggml_cuda_op_rms_norm(ctx, dst); // todo
             break;
-        case GGML_OP_MUL_MAT:
+        case GGML_OP_MUL_MAT: // todo
             if (dst->src[0]->ne[3] != dst->src[1]->ne[3]) {
                 GGML_CUDA_LOG_ERROR("%s: cannot compute %s: src0->ne[3] = %" PRId64 ", src1->ne[3] = %" PRId64 " - fallback to CPU\n", __func__, dst->name, dst->src[0]->ne[3], dst->src[1]->ne[3]);
                 return false;
@@ -2254,10 +2254,10 @@ static bool ggml_cuda_compute_forward(ggml_backend_cuda_context & ctx, struct gg
         case GGML_OP_DIAG_MASK_INF:
             ggml_cuda_op_diag_mask_inf(ctx, dst);
             break;
-        case GGML_OP_SOFT_MAX:
+        case GGML_OP_SOFT_MAX: // todo
             ggml_cuda_op_soft_max(ctx, dst);
             break;
-        case GGML_OP_ROPE:
+        case GGML_OP_ROPE: // todo
             ggml_cuda_op_rope(ctx, dst);
             break;
         case GGML_OP_IM2COL:

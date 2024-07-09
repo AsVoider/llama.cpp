@@ -137,20 +137,22 @@ struct ggml_backend_ascend_context {
 
     ~ggml_backend_ascend_context() {
         if (event != nullptr) {
-            // todo Check
-            aclrtDestroyEvent(event);
+            // todo Check: fixed
+            auto ret = aclrtDestroyEvent(event);
+            CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl destroy event failed at [~ggml_backend_ascend_context]: %d\n", ret));
         }
 
         for (auto i = 0; i < GGML_ASCEND_MAX_DEVICES; ++i) {
             for (auto j = 0; j < GGML_ASCEND_MAX_STREAMS; ++j) {
                 if (streams[i][j] != nullptr) {
-                    // todo Check
-                    aclrtDestroyStream(streams[i][j]);
+                    // todo Check: fixed
+                    auto ret = aclrtDestroyStream(streams[i][j]);
+                    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl destroy stream failed at [~ggml_backend_ascend_context]: %d\n", ret));
                 }
             }
 
             if (opHandles[i] != nullptr) {
-                // todo Check
+                // todo Check: fixed
             }
         }
     }
@@ -162,6 +164,10 @@ struct ggml_backend_ascend_context {
             aclrtCreateStreamWithConfig(&streams[device][stream], ACL_STREAM_FAST_SYNC);
         }
         return streams[device][stream];
+    }
+
+    aclrtStream stream() {
+        return stream(device, 0);
     }
 
     std::unique_ptr<ggml_ascend_pool> pools[GGML_ASCEND_MAX_DEVICES];

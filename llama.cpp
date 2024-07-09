@@ -4062,7 +4062,7 @@ struct llama_model_loader {
 
                 GGML_ASSERT(buf_mmap || cur->data); // either we have a buffer to allocate the tensor in, or it is already allocated
                 if (buf_mmap && cur->data == nullptr) {
-                    ggml_backend_tensor_alloc(buf_mmap, cur, data);
+                    ggml_backend_tensor_alloc(buf_mmap, cur, data); // todo 
                     if (lmlocks) {
                         const auto & lmlock = lmlocks->at(weight->idx);
                         lmlock->grow_to(weight->offs + n_size);
@@ -4072,7 +4072,7 @@ struct llama_model_loader {
                     mmap_used.first  = std::min(mmap_used.first,  weight->offs);
                     mmap_used.second = std::max(mmap_used.second, weight->offs + n_size);
                 } else {
-                    ggml_backend_tensor_set(cur, data, 0, n_size);
+                    ggml_backend_tensor_set(cur, data, 0, n_size); // todo
                 }
             } else {
                 GGML_ASSERT(weight->idx < files.size());
@@ -17300,6 +17300,26 @@ struct llama_context * llama_new_context_with_model(
                 return nullptr;
             }
             ctx->backends.push_back(ctx->backend_metal);
+        }
+#elif defined(GGML_USE_ASCEND)
+        if (model->split_mode == LLAMA_SPLIT_MODE_NONE || model->split_mode == LLAMA_SPLIT_MODE_ROW) {
+            ggml_backend_t backend = ggml_backend_ascend_init(model->main_gpu);
+            if (backend == nullptr) {
+                LLAMA_LOG_ERROR("%s: failed to initialize ASCEND%d backend\n", __func__, model->main_gpu);
+                llama_free(ctx);
+                return nullptr;
+            }
+            ctx->backends.push_back(backend);
+        } else {
+            for (int device = 0; device < ggml_backend_ascend_get_device_count(); ++device) {
+                ggml_backend_t backend = ggml_backend_ascend_init(device);
+                if (backend == nullptr) {
+                    LLAMA_LOG_ERROR("%s: failed to initialize ASCEND%d backend \n", __func__, device);
+                    llama_free(ctx);
+                    return nullptr;
+                }
+                ctx->backend.push_back(backend);
+            }
         }
 #elif defined(GGML_USE_CUDA)
         if (model->split_mode == LLAMA_SPLIT_MODE_NONE || model->split_mode == LLAMA_SPLIT_MODE_ROW) {
