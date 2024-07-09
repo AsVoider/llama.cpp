@@ -1988,6 +1988,8 @@ struct llama_state {
         ggml_backend_metal_log_set_callback(log_callback, log_callback_user_data);
 #elif defined(GGML_USE_CUDA)
         ggml_backend_cuda_log_set_callback(log_callback, log_callback_user_data);
+#elif defined(GGML_USE_ASCEND)
+        ggml_backend_ascend_log_set_callback(log_callback, log_callback_user_data);
 #endif
     }
 
@@ -3990,7 +3992,7 @@ struct llama_model_loader {
         std::vector<std::future<std::pair<ggml_tensor *, bool>>> validation_result;
 
 // TODO!!!!!!!
-#id defined(GGML_USE_ASCEND)
+// #if defined(GGML_USE_ASCEND)
     
 
 #if defined(GGML_USE_CUDA)
@@ -17044,6 +17046,8 @@ struct llama_model_quantize_params llama_model_quantize_default_params() {
 size_t llama_max_devices(void) {
 #if defined(GGML_USE_RPC)
     return GGML_RPC_MAX_SERVERS;
+#elif defined(GGML_USE_ASCEND)
+    return GGML_ASCEND_MAX_DEVICES;
 #elif defined(GGML_USE_METAL)
     return 1;
 #elif defined(GGML_USE_CUDA)
@@ -19799,6 +19803,8 @@ void llama_log_set(ggml_log_callback log_callback, void * user_data) {
     ggml_backend_metal_log_set_callback(g_state.log_callback, g_state.log_callback_user_data);
 #elif defined(GGML_USE_CUDA)
     ggml_backend_cuda_log_set_callback(g_state.log_callback, g_state.log_callback_user_data);
+#elif defined(GGML_USE_ASCEND)
+    ggml_backend_ascend_log_set_callback(g_state.log_callback, g_state.log_callback_user_data);
 #endif
 }
 

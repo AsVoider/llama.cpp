@@ -88,7 +88,7 @@ struct ggml_ascend_pool_alloc {
         alloc(size);
     }
 
-    ~ggml_ascemd_pool_alloc() {
+    ~ggml_ascend_pool_alloc() {
         if (ptr != nullptr) {
             pool->free(ptr, actual_size);
         }
@@ -161,7 +161,7 @@ struct ggml_backend_ascend_context {
         if (streams[device][stream] == nullptr) {
             ggml_ascend_set_device(device);
             // GGML_UNUSED(); todo check
-            aclrtCreateStreamWithConfig(&streams[device][stream], ACL_STREAM_FAST_SYNC);
+            aclrtCreateStreamWithConfig(&streams[device][stream], 0, ACL_STREAM_FAST_SYNC);
         }
         return streams[device][stream];
     }
