@@ -30,6 +30,14 @@ void aclnnRmsNormCompute(int64_t* ne, float* data, float* dst, float epi, aclrtC
 // dst = dst->data
 void aclnnAddCompute(int64_t* ne1, int64_t* ne2, float* data1, float* data2, float* dst, aclrtContext &context, aclrtStream &stream);
 
+// ne1 = dst->src[0]->ne
+// ne2 = dst->src[1]->ne
+// data = dst->src[0]->data
+// dst = dst->src[1]->data
+void aclnnCpyCompute(int64_t* ne1, int64_t* ne2,float* data, float* dst, aclrtContext &context, aclrtStream &stream);
+
+
+void aclnnGetRowsCompute(float* dst ,aclrtContext &context, aclrtStream &stream);
 /*
     Not For Usage Operators :
 */
