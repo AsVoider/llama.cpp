@@ -3,6 +3,11 @@
 
 #include <cstdint>
 #include <vector>
+#include <stdbool.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <stdio.h>
+#include "ggml.h"
 
 void ggml_ascend_get_rows(ggml_backend_ascned_context &ctx, ggml_tensor *dst);
 

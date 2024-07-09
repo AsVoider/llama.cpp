@@ -37,7 +37,13 @@ void aclnnAddCompute(int64_t* ne1, int64_t* ne2, float* data1, float* data2, flo
 void aclnnCpyCompute(int64_t* ne1, int64_t* ne2,float* data, float* dst, aclrtContext &context, aclrtStream &stream);
 
 
-void aclnnGetRowsCompute(float* dst ,aclrtContext &context, aclrtStream &stream);
+// ne1 = dst->src[0]->ne
+// ne2 = dst->src[1]->ne
+// ne = dst->ne
+// src1 = dst->src[0]->data
+// src2 = dst->src[1]->data
+// dst = dst->data
+void aclnnGetRowsCompute(int64_t* ne1, int64_t* ne2, int64_t* ne, float* src1, float* src2, float* dst ,aclrtContext &context, aclrtStream &stream);
 /*
     Not For Usage Operators :
 */
