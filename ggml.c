@@ -5996,7 +5996,7 @@ struct ggml_tensor * ggml_get_rows(
     return result;
 }
 
-// ggml_get_rows_back
+// ggml_get_rows_back   
 
 struct ggml_tensor * ggml_get_rows_back(
         struct ggml_context * ctx,

@@ -141,7 +141,8 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
     ~ggml_ascend_pool_leg() {
         ggml_ascend_set_device(device);
         for (int i = 0; i < MAX_BUFFERS; ++i) {
-            if (auto &b = buffer_pool[i]; b.ptr != nullptr) {
+            auto &b = buffer_pool[i];
+            if (b.ptr != nullptr) {
                 // todo Check: fixed
                 auto ret = aclrtFree(b.ptr);
                 CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl free failed at [~ggml_ascend_pool_leg]: %d\n", ret); return);
@@ -156,7 +157,8 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
         size_t best_diff = 1ull << 36;  // 2 * 36
         int ibest = 1;
         for (int i = 0; i < MAX_BUFFERS; ++i) {
-            if (auto &b = buffer_pool[i]; b.ptr != nullptr) {
+            auto &b = buffer_pool[i];
+            if (b.ptr != nullptr) {
                 if (b.size >= size) {
                     auto diff = b.size - size;
                     if (diff < best_diff) {
@@ -209,12 +211,12 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl free failed at [ggml_ascend_pool_leg free]: %d\n", ret); return);
         pool_size -= size;
     }
-}
+};
 
-std::unique_ptr<ggml_ascend_pool> ggml_backend_ascend_context::new_pool_for_device(int device) {
-    // todo if vmm?: fixed
-    return std::unique_ptr<ggml_ascend_pool>(new ggml_ascend_pool_leg(device));
-}
+// std::unique_ptr<ggml_ascend_pool> ggml_backend_ascend_context::new_pool_for_device(int device) {
+//     // todo if vmm?: fixed
+//     return std::unique_ptr<ggml_ascend_pool>(new ggml_ascend_pool_leg(device));
+// }
 
 // ascend buffer copy
 
@@ -223,7 +225,7 @@ struct ggml_backend_ascend_buffer_context {
     void * dev_ptr = nullptr;
     std::string name;
 
-    ggml_backend_ascend_buffer_context() :
+    ggml_backend_ascend_buffer_context(int device, void * dev_ptr) :
         device(device), dev_ptr(dev_ptr), 
         name(GGML_ASCEND_NAME + std::to_string(device)) {
     } 
@@ -234,6 +236,12 @@ struct ggml_backend_ascend_buffer_context {
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl free failed at [~ggml_backend_ascend_buffer_context]: %d\n", ret); return);
     }
 };
+
+std::unique_ptr<ggml_ascend_pool> ggml_backend_ascend_context::new_pool_for_device(int device) {
+    // todo if vmm?: fixed
+    return std::unique_ptr<ggml_ascend_pool>(new ggml_ascend_pool_leg(device));
+}
+
 
 GGML_CALL static const char * ggml_backend_ascend_buffer_get_name(ggml_backend_buffer_t buffer) {
     ggml_backend_ascend_buffer_context * ctx = (ggml_backend_ascend_buffer_context *)buffer->context;
