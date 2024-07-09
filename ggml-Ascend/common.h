@@ -1,12 +1,17 @@
 //
 // Created by 35763 on 2024/6/26.
 //
+#pragma once
 
 #ifndef COMMON_H
 #define COMMON_H
 
 #include <iostream>
 #include <vector>
+#include <memory>
+
+#include "ggml.h"
+#include "ggml-ascend.h"
 #include "acl/acl.h"
 #include "aclnnop/aclnn_add.h"
 
@@ -22,6 +27,7 @@ do {                              \
 printf(message, ##__VA_ARGS__); \
 } while (0)
 
+#define GGML_ASCEND_MAX_STREAMS 8
 
 int64_t GetShapeSize(const std::vector<int64_t>& shape);
 int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream);
@@ -49,6 +55,135 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     return 0;
 }
 
+void ggml_ascend_set_device(int device);
+int ggml_ascend_get_device();
 
+struct ggml_ascend_pool {
+    virtual ~ggml_ascend_pool() = default;
+
+    virtual void * alloc(size_t size, size_t * actual_size) = 0;
+    virtual void free(void * ptr, size_t size) = 0;
+};
+
+struct ggml_graph_node_properties {
+    void * node_address;
+    ggml_op node_op;
+    int64_t ne[GGML_MAX_DIMS];
+    size_t nb[GGML_MAX_DIMS];
+    void * src_address[GGML_MAX_SRC];
+};
+
+template<typename T>
+struct ggml_ascend_pool_alloc {
+    ggml_ascend_pool * pool = nullptr;
+    T * ptr = nullptr;
+    size_t actual_size = 0;
+
+    ggml_ascend_pool_alloc() = default;
+
+    explicit ggml_ascend_pool_alloc(ggml_ascend_pool & pool) : pool(&pool) {
+    }
+
+    ggml_ascend_pool_alloc(ggml_ascend_pool & pool, size_t size) : pool(&pool) {
+        alloc(size);
+    }
+
+    ~ggml_ascemd_pool_alloc() {
+        if (ptr != nullptr) {
+            pool->free(ptr, actual_size);
+        }
+    }
+
+    // size is in number of elements
+    T * alloc(size_t size) {
+        GGML_ASSERT(pool != nullptr);
+        GGML_ASSERT(ptr == nullptr);
+        ptr = (T *) pool->alloc(size * sizeof(T), &this->actual_size);
+        return ptr;
+    }
+
+    T * alloc(ggml_ascend_pool & pool, size_t size) {
+        this->pool = &pool;
+        return alloc(size);
+    }
+
+    T * get() {
+        return ptr;
+    }
+
+    ggml_ascend_pool_alloc(const ggml_ascend_pool_alloc &) = delete;
+    ggml_ascend_pool_alloc(ggml_ascend_pool_alloc &&) = delete;
+    ggml_ascend_pool_alloc& operator=(const ggml_ascend_pool_alloc &) = delete;
+    ggml_ascend_pool_alloc& operator=(ggml_ascend_pool_alloc &&) = delete;
+};
+
+struct ggml_ascend_graph {
+
+};
+
+struct ggml_backend_ascend_context {
+    int device;
+    std::string name;
+    aclrtEvent event = nullptr;
+
+    aclrtStream streams[GGML_ASCEND_MAX_DEVICES][GGML_ASCEND_MAX_STREAMS] = { { nullptr } };
+    void * opHandles[GGML_ASCEND_MAX_DEVICES] = { nullptr }; //??
+
+    std::unique_ptr<ggml_ascend_graph> ascend_graph;
+
+    explicit ggml_backend_ascend_context(int device) :
+        device(device),
+        name(GGML_ASCEND_NAME + std::to_string(device)) {}
+
+    ~ggml_backend_ascend_context() {
+        if (event != nullptr) {
+            // todo Check: fixed
+            auto ret = aclrtDestroyEvent(event);
+            CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl destroy event failed at [~ggml_backend_ascend_context]: %d\n", ret));
+        }
+
+        for (auto i = 0; i < GGML_ASCEND_MAX_DEVICES; ++i) {
+            for (auto j = 0; j < GGML_ASCEND_MAX_STREAMS; ++j) {
+                if (streams[i][j] != nullptr) {
+                    // todo Check: fixed
+                    auto ret = aclrtDestroyStream(streams[i][j]);
+                    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl destroy stream failed at [~ggml_backend_ascend_context]: %d\n", ret));
+                }
+            }
+
+            if (opHandles[i] != nullptr) {
+                // todo Check: fixed
+            }
+        }
+    }
+
+    aclrtStream stream(int device, int stream) {
+        if (streams[device][stream] == nullptr) {
+            ggml_ascend_set_device(device);
+            // GGML_UNUSED(); todo check
+            aclrtCreateStreamWithConfig(&streams[device][stream], ACL_STREAM_FAST_SYNC);
+        }
+        return streams[device][stream];
+    }
+
+    aclrtStream stream() {
+        return stream(device, 0);
+    }
+
+    std::unique_ptr<ggml_ascend_pool> pools[GGML_ASCEND_MAX_DEVICES];
+
+    static std::unique_ptr<ggml_ascend_pool> new_pool_for_device(int device);
+
+    ggml_ascend_pool & pool(int device) {
+        if (pools[device] == nullptr) {
+            pools[device] = new_pool_for_device(device);
+        }
+        return *pools[device];
+    }
+
+    ggml_ascend_pool & pool() {
+        return pool(device);
+    }
+}
 
 #endif //COMMON_H
