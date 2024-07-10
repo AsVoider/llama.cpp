@@ -86,14 +86,23 @@ void aclnnCpyCompute(int64_t* ne1, int64_t* ne2,float* data, float* dst, aclrtCo
   int ret = aclnnCpyFunc(selfRefShape, srcShape, selfRefHostData, srcHostData, dst, context, stream);
 }
 
-void aclnnGetRowsCompute(float* dst ,aclrtContext &context, aclrtStream &stream){
-  std::vector<int64_t> selfShape = {4, 2};
-  std::vector<int64_t> indexShape = {2};
-  std::vector<int64_t> outShape = {2, 2};
-  int64_t dim = 0;
-  std::vector<float> selfHostData = {0, 1, 2, 3, 4, 5, 6, 7};
-  std::vector<int> indexHostData = {1, 0};
-  std::vector<float> outHostData = {0, 0, 0, 0, 0, 0, 0, 0};
+void aclnnGetRowsCompute(int64_t* ne1, int64_t* ne2, int64_t* ne, float* src1, float* src2, float* dst ,aclrtContext &context, aclrtStream &stream){
+  std::vector<int64_t> selfShape = {1, 1, ne1[1]*ne1[2]*ne1[3], ne1[0]};
+  std::vector<int64_t> indexShape = {ne2[0]*ne2[1]*ne2[2]};
+  std::vector<int64_t> outShape = {1, 1, ne2[0]*ne2[1]*ne2[2], ne1[0]};
+  int64_t dim = 2;
+  std::vector<float> selfHostData(src1 ,src1+ ne1[0]*ne1[1]*ne1[2]*ne1[3]);
+  std::vector<int> indexHostData(src2, src2+ ne2[0]*ne2[1]*ne2[2]*ne2[3]);
+  std::vector<float> outHostData(ne[0]*ne[1]*ne[2]*ne[3], 0);
+  for(int i = 0; i < ne2[1]*ne2[2]*ne2[3]; i++){
+    for(int j = 0; j< ne2[0]; j++){
+      indexHostData[i*ne2[0]+j] += i* ne1[1];
+    }
+  }
+  for(int i = 0; i< indexHostData.size();i++){
+    std::cout<< indexHostData[i]<<" ";
+  }
+  std::cout<<std::endl;
   int ret = aclnnGetRowsFunc(selfShape, indexShape, outShape, dim, selfHostData, indexHostData, outHostData, dst, context, stream);
 }
 

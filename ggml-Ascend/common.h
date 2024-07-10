@@ -184,6 +184,6 @@ struct ggml_backend_ascend_context {
     ggml_ascend_pool & pool() {
         return pool(device);
     }
-}
+};
 
 #endif //COMMON_H
