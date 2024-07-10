@@ -223,7 +223,7 @@ struct ggml_backend_ascend_buffer_context {
     void * dev_ptr = nullptr;
     std::string name;
 
-    ggml_backend_ascend_buffer_context() :
+    ggml_backend_ascend_buffer_context(int device, void * dev_ptr) :
         device(device), dev_ptr(dev_ptr), 
         name(GGML_ASCEND_NAME + std::to_string(device)) {
     } 
