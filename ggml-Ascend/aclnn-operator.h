@@ -44,6 +44,24 @@ void aclnnCpyCompute(int64_t* ne1, int64_t* ne2,float* data, float* dst, aclrtCo
 // src2 = dst->src[1]->data
 // dst = dst->data
 void aclnnGetRowsCompute(int64_t* ne1, int64_t* ne2, int64_t* ne, float* src1, float* src2, float* dst ,aclrtContext &context, aclrtStream &stream);
+
+// ne1 = dst->src[0]->ne
+// ne2 = dst->src[1]->ne
+// ne = dst->ne
+// data1 = dst->src[0]->data
+// data2 = dst->src[1]->data
+// dst = dst->data
+void aclnnMulMatCompute(int64_t* ne1, int64_t* ne2, int64_t* ne, float* data1, float* data2, float* dst, aclrtContext &context, aclrtStream &stream);
+
+// ne = dst->src[0]->ne
+// x = dst->src[0]->data
+// dst = dst->data
+// freq_scale = dst->op_params[6];
+// freq_base = dst->op_params[5];
+// n_dims = dst->op_params[1];
+// pos = dst->src[1]->data
+void aclnnRopeCompute(int64_t *ne, float freq_scale, float freq_base, int n_dims, int32_t* pos, float* x, float* dst ,aclrtContext &context, aclrtStream &stream);
+
 /*
     Not For Usage Operators :
 */

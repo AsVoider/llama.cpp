@@ -14,7 +14,7 @@ void aclnnMulTest();
 int aclnnMulsFunc(std::vector<float>& selfHostData, std::vector<float>& outHostData, float otherValue, std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape,float* dst, aclrtContext &context, aclrtStream &stream);
 void aclnnMulsTest();
 
-int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2HostData, std::vector<int64_t>& selfShape, std::vector<int64_t>& mat2Shape,std::vector<int64_t>& outShape, std::vector<float>& outHostData);
+int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2HostData, std::vector<int64_t>& selfShape, std::vector<int64_t>& mat2Shape,std::vector<int64_t>& outShape, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream);
 void aclnnMulMatTest();
 
 

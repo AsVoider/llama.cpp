@@ -36,6 +36,7 @@ add_executable(test
         aclnn-rope.cpp
         aclnn-sqrt.cpp
         aclnn-unary.cpp
+        aclnn-math.cpp
         common.cpp)
 
 # 设置ASCEND_PATH（CANN软件包目录，请根据实际路径修改）和INCLUDE_BASE_DIR（头文件目录）

@@ -147,12 +147,7 @@ int aclnnMulsFunc(std::vector<float>& selfHostData, std::vector<float>& outHostD
   return 0;
 }
 
-int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2HostData, std::vector<int64_t>& selfShape, std::vector<int64_t>& mat2Shape,std::vector<int64_t>& outShape, std::vector<float>& outHostData){
-  int32_t deviceId = 0;
-  aclrtContext context;
-  aclrtStream stream;
-  auto ret = Init(deviceId, &context, &stream);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
+int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2HostData, std::vector<int64_t>& selfShape, std::vector<int64_t>& mat2Shape,std::vector<int64_t>& outShape, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream){
 
   // 2. 构造输入与输出，需要根据API的接口自定义构造
 
@@ -164,7 +159,7 @@ int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2Ho
   aclTensor* out = nullptr;
 
   // 创建self aclTensor
-  ret = CreateAclTensor(selfHostData, selfShape, &selfDeviceAddr, aclDataType::ACL_FLOAT, &self);
+  auto ret = CreateAclTensor(selfHostData, selfShape, &selfDeviceAddr, aclDataType::ACL_FLOAT, &self);
   CHECK_RET(ret == ACL_SUCCESS, return ret);
   // 创建other aclTensor
   ret = CreateAclTensor(mat2HostData, mat2Shape, &mat2DeviceAddr, aclDataType::ACL_FLOAT, &mat2);
@@ -203,6 +198,7 @@ int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2Ho
   for (int64_t i = 0; i < size; i++) {
     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
   }
+  std::copy(resultData.data(), resultData.data() + resultData.size(), dst);
 
   // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
   aclDestroyTensor(self);
@@ -217,10 +213,6 @@ int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2Ho
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
   }
-  aclrtDestroyStream(stream);
-  aclrtDestroyContext(context);
-  aclrtResetDevice(deviceId);
-  aclFinalize();
   return 0;
 }
 
@@ -255,7 +247,7 @@ void aclnnMulMatTest(){
   std::vector<float> selfHostData1(1024, 1);
   std::vector<float> mat2HostData1(128, 1);
   std::vector<float> outHostData1(2048, 0);
-  int ret = aclnnMulMatFunc(selfHostData1, mat2HostData1, selfShape1, mat2Shape1, outShape1, outHostData1);
+ // int ret = aclnnMulMatFunc(selfHostData1, mat2HostData1, selfShape1, mat2Shape1, outShape1, outHostData1);
 }
 
 
