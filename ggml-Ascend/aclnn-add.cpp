@@ -22,7 +22,7 @@ int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** d
     return 0;
 }
 
-int aclnn_add_func( void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
+int aclnn_add_func(void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
 	aclnn_shape_t& selfShape, aclnn_shape_t& otherShape, aclnn_shape_t& outShape,
     aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
     aclrtStream &stream) {

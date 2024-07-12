@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include "ggml.h"
+#include "common.h"
 
 void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
 
