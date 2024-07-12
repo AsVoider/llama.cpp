@@ -29,6 +29,10 @@ printf(message, ##__VA_ARGS__); \
 
 #define GGML_ASCEND_MAX_STREAMS 8
 
+#define aclnn_shape_t std::vector<int64_t>
+
+extern aclDataType ggml_to_acl_map[GGML_TYPE_COUNT];
+
 int64_t GetShapeSize(const std::vector<int64_t>& shape);
 int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream);
 
@@ -54,6 +58,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
                               shape.data(), shape.size(), *deviceAddr);
     return 0;
 }
+
+int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** deviceAddr, aclTensor** tensor);
 
 void ggml_ascend_set_device(int device);
 int ggml_ascend_get_device();
@@ -155,6 +161,21 @@ struct ggml_backend_ascend_context {
                 // todo Check: fixed
             }
         }
+    }
+
+    void ggml_ascend_set_device(int device) {
+        int current_device;
+        // todo Check: fixed
+        auto ret = aclrtGetDevice(&current_device);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_set_device]: %d\n", ret); return);
+
+        if (device == current_device) {
+            return;
+        }
+
+        // todo Check: fixed
+        ret = aclrtSetDevice(device);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl set device failed at [ggml_ascend_set_device]: %d\n", ret); return);
     }
 
     aclrtStream stream(int device, int stream) {

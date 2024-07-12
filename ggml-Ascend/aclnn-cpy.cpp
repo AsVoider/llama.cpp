@@ -6,6 +6,48 @@
 #include "aclnnop/aclnn_copy.h"
 #include "aclnnop/aclnn_index_select.h"
 
+int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
+    aclnn_shape_t& selfRefShape, aclnn_shape_t& srcShape,
+    aclDataType selfRefDataType, aclDataType srcDataType,
+    aclrtStream &stream) {
+    
+    auto ret = 0;
+
+    aclTensor* selfRef = nullptr;
+    aclTensor* src = nullptr;
+
+    ret = create_acl_tensor(selfRefShape, selfRefDataType, &selfRefDataAddr, &selfRef);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = create_acl_tensor(srcShape, srcDataType, &srcDataAddr, &src);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor;
+
+    ret = aclnnInplaceCopyGetWorkspaceSize(selfRef, src, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInplaceCopyGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+
+    void* workspaceAddr = nullptr;
+    if (workspaceSize > 0) {
+        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+    }
+    ret = aclnnInplaceCopy(workspaceAddr, workspaceSize, executor, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInplaceCopy failed. ERROR: %d\n", ret); return ret);
+
+    ret = aclrtSynchronizeStream(stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+    aclDestroyTensor(selfRef);
+    aclDestroyTensor(src);
+
+    if (workspaceSize > 0) {
+        aclrtFree(workspaceAddr);
+    }
+
+    return 0;
+}
+
 int aclnnCpyFunc(std::vector<int64_t>& selfRefShape, std::vector<int64_t>& srcShape, std::vector<float>& selfRefHostData, std::vector<float>& srcHostData,  float* dst, aclrtContext &context, aclrtStream &stream){
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfRefDeviceAddr = nullptr;
@@ -60,6 +102,52 @@ int aclnnCpyFunc(std::vector<int64_t>& selfRefShape, std::vector<int64_t>& srcSh
   return 0;
 }
 
+int aclnn_get_rows_func(void* selfDataAddr, void* indexDataAddr, void* outDataAddr,
+	aclnn_shape_t& selfShape, aclnn_shape_t& indexShape, aclnn_shape_t& outShape,
+	aclDataType selfDataType, aclDataType indexDataType, aclDataType outDataType,
+	aclrtStream &stream) {
+	
+	auto ret = 0;
+
+	aclTensor* self = nullptr;
+	aclTensor* index = nullptr;
+	aclTensor* out = nullptr;
+
+	int64_t dim = 2;
+
+	ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
+	CHECK_RET(ret == ACL_SUCCESS, return ret);
+	ret = create_acl_tensor(indexShape, indexDataType, &indexDataAddr, &index);
+	CHECK_RET(ret == ACL_SUCCESS, return ret);
+	ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+	CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+	uint64_t workspaceSize = 0;
+	aclOpExecutor* executor;
+
+	ret = aclnnIndexSelectGetWorkspaceSize(self, dim, index, out, &workspaceSize, &executor);
+	CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnIndexSelectGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+	void* workspaceAddr = nullptr;
+	if (workspaceSize > 0) {
+		ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+		CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+	}
+	ret = aclnnIndexSelect(workspaceAddr, workspaceSize, executor, stream);
+	CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnIndexSelect failed. ERROR: %d\n", ret); return ret);
+
+	ret = aclrtSynchronizeStream(stream);
+	CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+	aclDestroyTensor(self);
+	aclDestroyTensor(index);
+	aclDestroyTensor(out);
+
+	if (workspaceSize > 0) {
+		aclrtFree(workspaceAddr);
+	}
+
+	return 0;
+}
 
 int aclnnGetRowsFunc(  std::vector<int64_t> &selfShape,
   std::vector<int64_t> &indexShape,

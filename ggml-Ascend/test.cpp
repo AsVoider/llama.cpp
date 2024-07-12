@@ -1,5 +1,7 @@
 #include <iostream>
 #include <vector>
+
+#include "aclnn-compute.h"
 #include "acl/acl.h"
 #include "aclnnop/aclnn_add.h"
 
@@ -13,15 +15,7 @@
 #define LOG_PRINT(message, ...)     \
   do {                              \
     printf(message, ##__VA_ARGS__); \
-  } while (0)
-
-int64_t GetShapeSize(const std::vector<int64_t>& shape) {
-  int64_t shapeSize = 1;
-  for (auto i : shape) {
-    shapeSize *= i;
-  }
-  return shapeSize;
-}
+  } while (0) 
 
 int Init(int32_t deviceId, aclrtStream* stream) {
   // 固定写法，AscendCL初始化
@@ -33,100 +27,11 @@ int Init(int32_t deviceId, aclrtStream* stream) {
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
   return 0;
 }
-
-template <typename T>
-int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& shape, void** deviceAddr,
-                    aclDataType dataType, aclTensor** tensor) {
-  auto size = GetShapeSize(shape) * sizeof(T);
-  // 调用aclrtMalloc申请device侧内存
-  auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
-  // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
-  ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
-
-  // 计算连续tensor的strides
-  std::vector<int64_t> strides(shape.size(), 1);
-  for (int64_t i = shape.size() - 2; i >= 0; i--) {
-    strides[i] = shape[i + 1] * strides[i + 1];
-  }
-
-  // 调用aclCreateTensor接口创建aclTensor
-  *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                            shape.data(), shape.size(), *deviceAddr);
-  return 0;
-}
-
 /*
 
 */
 #define aclnn_shape_t std::vector<int64_t>
 
-int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** deviceAddr, aclTensor** tensor) {
-    // 计算连续tensor的strides
-    std::vector<int64_t> strides(shape.size(), 1);
-    for (int64_t i = shape.size() - 2; i >= 0; i--) {
-        strides[i] = shape[i + 1] * strides[i + 1];
-    }
-
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                              shape.data(), shape.size(), *deviceAddr);
-    return 0;
-}
-
-int aclnn_add_func( void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
-	aclnn_shape_t& selfShape, aclnn_shape_t& otherShape, aclnn_shape_t& outShape,
-    aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
-    aclrtStream &stream) {
-    
-    auto ret = 0;
-
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
-
-    float alphaValue = 1.0f;
-
-    ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = create_acl_tensor(otherShape, otherDataType, &otherDataAddr, &other);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-    alpha = aclCreateScalar(&alphaValue, aclDataType::ACL_FLOAT);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
-
-    uint64_t workspaceSize = 0;
-    aclOpExecutor* executor;
-
-    ret = aclnnAddGetWorkspaceSize(self, other, alpha, out, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnAddGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
-    void* workspaceAddr = nullptr;
-    if (workspaceSize > 0) {
-        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
-    }
-    ret = aclnnAdd(workspaceAddr, workspaceSize, executor, stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnAdd failed. ERROR: %d\n", ret); return ret);
-
-    ret = aclrtSynchronizeStream(stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
-
-    aclDestroyTensor(self);
-    aclDestroyTensor(other);
-    aclDestroyScalar(alpha);
-    aclDestroyTensor(out);
-    
-    if (workspaceSize > 0) {
-        aclrtFree(workspaceAddr);
-    }
-
-    return 0;
-}
-/*
-
-*/
 template <typename T>
 int data_addr_malloc(const aclnn_shape_t& shape, const std::vector<T>& hostData, void** deviceAddr) {
     auto size = GetShapeSize(shape) * sizeof(T);
@@ -169,10 +74,39 @@ int main() {
     ret = data_addr_malloc(outShape, outHostData, &outDeviceAddr);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
 
-    aclnn_add_func( selfDeviceAddr, otherDeviceAddr, outDeviceAddr,
-                    selfShape, otherShape, outShape,
-                    aclDataType::ACL_FLOAT, aclDataType::ACL_FLOAT, aclDataType::ACL_FLOAT,
-                    stream);
+    ggml_backend_ascend_context* ctx = new ggml_backend_ascend_context(deviceId);
+    ctx->streams[deviceId][0] = stream;
+
+    const int64_t ne[4] = {2, 4, 1, 1};
+
+    ggml_tensor* src0 = new ggml_tensor();
+    src0->ne[0] = ne[0];
+    src0->ne[1] = ne[1];
+    src0->ne[2] = ne[2];
+    src0->ne[3] = ne[3];
+    src0->type = GGML_TYPE_F32;
+    src0->data = selfDeviceAddr;
+
+    ggml_tensor* src1 = new ggml_tensor();
+    src1->ne[0] = ne[0];
+    src1->ne[1] = ne[1];
+    src1->ne[2] = ne[2];
+    src1->ne[3] = ne[3];
+    src1->type = GGML_TYPE_F32;
+    src1->data = otherDeviceAddr;
+
+    ggml_tensor* dst = new ggml_tensor();
+    dst->ne[0] = ne[0];
+    dst->ne[1] = ne[1];
+    dst->ne[2] = ne[2];
+    dst->ne[3] = ne[3];
+    dst->type = GGML_TYPE_F32;
+    dst->data = outDeviceAddr;
+    dst->src[0] = src0;
+    dst->src[1] = src1;
+
+    ggml_ascend_silu(*ctx, dst);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
 
     auto size = GetShapeSize(outShape);
     std::vector<float> resultData(size, 0);

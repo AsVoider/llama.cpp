@@ -8,20 +8,6 @@
 #include "aclnn-add.h"
 #include "common.h"
 
-#define aclnn_shape_t std::vector<int64_t>
-
-int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** deviceAddr, aclTensor** tensor) {
-    // 计算连续tensor的strides
-    std::vector<int64_t> strides(shape.size(), 1);
-    for (int64_t i = shape.size() - 2; i >= 0; i--) {
-        strides[i] = shape[i + 1] * strides[i + 1];
-    }
-
-    *tensor = aclCreateTensor(shape.data(), shape.size(), dataType, strides.data(), 0, aclFormat::ACL_FORMAT_ND,
-                              shape.data(), shape.size(), *deviceAddr);
-    return 0;
-}
-
 int aclnn_add_func(void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
 	aclnn_shape_t& selfShape, aclnn_shape_t& otherShape, aclnn_shape_t& outShape,
     aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
