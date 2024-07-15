@@ -8,6 +8,11 @@
 #include <cstdint>
 #include <vector>
 
+int aclnn_mul_func(void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
+    aclnn_shape_t& selfShape, aclnn_shape_t& otherShape, aclnn_shape_t& outShape,
+    aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
+    aclrtStream &stream);
+
 int aclnnMulFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& otherShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& otherHostData, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream);
 void aclnnMulTest();
 

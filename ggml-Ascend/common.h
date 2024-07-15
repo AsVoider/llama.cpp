@@ -29,6 +29,10 @@ printf(message, ##__VA_ARGS__); \
 
 #define GGML_ASCEND_MAX_STREAMS 8
 
+#define aclnn_shape_t std::vector<int64_t>
+
+extern aclDataType ggml_to_acl_map[GGML_TYPE_COUNT];
+
 int64_t GetShapeSize(const std::vector<int64_t>& shape);
 int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream);
 
@@ -55,6 +59,8 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     return 0;
 }
 
+int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** deviceAddr, aclTensor** tensor);
+
 void ggml_ascend_set_device(int device);
 int ggml_ascend_get_device();
 
@@ -72,6 +78,18 @@ struct ggml_graph_node_properties {
     size_t nb[GGML_MAX_DIMS];
     void * src_address[GGML_MAX_SRC];
 };
+
+template <typename T>
+int data_addr_malloc(const aclnn_shape_t& shape, const std::vector<T>& hostData, void** deviceAddr) {
+    auto size = GetShapeSize(shape) * sizeof(T);
+    // 调用aclrtMalloc申请device侧内存
+    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
+    // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
+    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
+    return 0;
+}
 
 template<typename T>
 struct ggml_ascend_pool_alloc {
@@ -155,6 +173,21 @@ struct ggml_backend_ascend_context {
                 // todo Check: fixed
             }
         }
+    }
+
+    void ggml_ascend_set_device(int device) {
+        int current_device;
+        // todo Check: fixed
+        auto ret = aclrtGetDevice(&current_device);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_set_device]: %d\n", ret); return);
+
+        if (device == current_device) {
+            return;
+        }
+
+        // todo Check: fixed
+        ret = aclrtSetDevice(device);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl set device failed at [ggml_ascend_set_device]: %d\n", ret); return);
     }
 
     aclrtStream stream(int device, int stream) {

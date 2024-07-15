@@ -216,6 +216,7 @@ int aclnnGroupNormFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& ga
 }
 
 
+
 int aclnnRmsNormFunc( std::vector<int64_t>& xShape,
   std::vector<int64_t>& gammaShape,
   std::vector<int64_t>& yShape,

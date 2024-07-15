@@ -14,29 +14,17 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY  "./bin")
 set(CMAKE_CXX_FLAGS_DEBUG "-fPIC -O0 -g -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-fPIC -O2 -Wall")
 
-set(BASE_LLAMA_DIR "/home/powerinfer/Desktop/tz/llama/llama.cpp")
+set(BASE_LLAMA_DIR "/home/powerinfer/CYM/llama.cpp")
 file(GLOB SRC_LIST ${BASE_LLAMA_DIR}/*.cpp ${BASE_LLAMA_DIR}/*.h ${BASE_LLAMA_DIR}/*.c)
 
 # 设置可执行文件名（如test_1），并指定待运行算子文件*.cpp所在目录
 add_executable(test
-        main.cpp
-        #test.cpp
-        aclnn-operator.cpp
+        test.cpp
+        aclnn-compute.cpp
         aclnn-add.cpp
-        aclnn-arange.cpp
         aclnn-mul.cpp
-        aclnn-norm.cpp
-        aclnn-div.cpp
-        aclnn-sort.cpp
-        aclnn-comp.cpp
-        aclnn-clamp.cpp
-        aclnn-leaky.cpp
-        aclnn-im2col.cpp
         aclnn-cpy.cpp
-        aclnn-rope.cpp
-        aclnn-sqrt.cpp
         aclnn-unary.cpp
-        aclnn-math.cpp
         common.cpp)
 
 # 设置ASCEND_PATH（CANN软件包目录，请根据实际路径修改）和INCLUDE_BASE_DIR（头文件目录）

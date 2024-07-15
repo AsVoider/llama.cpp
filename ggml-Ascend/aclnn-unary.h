@@ -3,6 +3,12 @@
 
 #include <cstdint>
 #include <vector>
+#include "common.h"
+
+int aclnn_silu_func(void* selfDataAddr, void* outDataAddr,
+    aclnn_shape_t selfShape, aclnn_shape_t outShape,
+    aclDataType selfDataType, aclDataType outDataType,
+    aclrtStream &stream);
 
 int aclnnSigmoidFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst);
 

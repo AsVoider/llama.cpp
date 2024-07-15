@@ -66,7 +66,7 @@ void aclnnAddCompute(int64_t* ne1, int64_t* ne2,float* data1, float* data2, floa
   int ret = aclnnAddFunc(selfHostData, otherHostData,alphaValue, selfShape, otherShape, outShape, dst, context, stream);
 }
 
-void aclnnMulsCompute(int64_t* ne1, int64_t* ne2,float* data1, float* data2, float* dst, aclrtContext &context, aclrtStream &stream){
+void aclnnMulCompute(int64_t* ne1, int64_t* ne2,float* data1, float* data2, float* dst, aclrtContext &context, aclrtStream &stream){
   std::vector<float> selfHostData(data1, data1 + ne1[3]*ne1[2]*ne1[1]*ne1[0]);
   std::vector<float> otherHostData(data2, data2 + ne2[3]*ne2[2]*ne2[1]*ne2[0]);
   std::vector<int64_t> selfShape = {ne1[3], ne1[2], ne1[1], ne1[0]};
