@@ -29,6 +29,9 @@ printf(message, ##__VA_ARGS__); \
 
 #define GGML_ASCEND_MAX_STREAMS 8
 
+[[noreturn]]
+void ggml_ascend_error(const char * stmt, const char * func, const char * file, int line, const char * msg);
+
 #define aclnn_shape_t std::vector<int64_t>
 
 extern aclDataType ggml_to_acl_map[GGML_TYPE_COUNT];

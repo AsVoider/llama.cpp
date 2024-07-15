@@ -2672,7 +2672,7 @@ static ggml_backend_buffer_type_t llama_default_buffer_type_offload(const llama_
     buft = ggml_backend_metal_buffer_type();
 #elif defined(GGML_USE_CUDA)
     buft = ggml_backend_cuda_buffer_type(gpu);
-#elif defince(GGML_USE_ASCEND)
+#elif defined(GGML_USE_ASCEND)
     buft = ggml_backend_ascend_buffer_type(gpu);
 #elif defined(GGML_USE_VULKAN)
     buft = ggml_backend_vk_buffer_type(gpu);
@@ -17322,7 +17322,7 @@ struct llama_context * llama_new_context_with_model(
                     llama_free(ctx);
                     return nullptr;
                 }
-                ctx->backend.push_back(backend);
+                ctx->backends.push_back(backend);
             }
         }
 #elif defined(GGML_USE_CUDA)
