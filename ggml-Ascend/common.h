@@ -29,6 +29,9 @@ printf(message, ##__VA_ARGS__); \
 
 #define GGML_ASCEND_MAX_STREAMS 8
 
+[[noreturn]]
+void ggml_ascend_error(const char * stmt, const char * func, const char * file, int line, const char * msg);
+
 int64_t GetShapeSize(const std::vector<int64_t>& shape);
 int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream);
 
