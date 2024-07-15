@@ -61,13 +61,13 @@ int aclnnCpyFunc(std::vector<int64_t>& selfRefShape, std::vector<int64_t>& srcSh
 }
 
 
-int aclnnGetRowsFunc(  std::vector<int64_t> selfShape,
-  std::vector<int64_t> indexShape,
-  std::vector<int64_t> outShape,
+int aclnnGetRowsFunc(  std::vector<int64_t> &selfShape,
+  std::vector<int64_t> &indexShape,
+  std::vector<int64_t> &outShape,
   int64_t dim,
-  std::vector<float> selfHostData,
-  std::vector<int> indexHostData,
-  std::vector<float> outHostData,float* dst, aclrtContext &context, aclrtStream &stream){
+  std::vector<float> &selfHostData,
+  std::vector<int> &indexHostData,
+  std::vector<float> &outHostData,float* dst, aclrtContext &context, aclrtStream &stream){
   
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfDeviceAddr = nullptr;

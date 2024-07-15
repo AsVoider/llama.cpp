@@ -6,17 +6,12 @@
 #include "common.h"
 
 int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keyShape, std::vector<int64_t>& cosShape, std::vector<int64_t>& sinShape, 
-    std::vector<float>& queryHostData, std::vector<float>& keyHostData, std::vector<float>& cosHostData, std::vector<float>& sinHostData ){
-    // 1. 固定写法，device/context/stream初始化, 参考AscendCL对外接口列表
-    // 根据自己的实际device填写deviceId
-    int32_t deviceId = 0;
-    aclrtContext context;
-    aclrtStream stream;
-    auto ret = Init(deviceId, &context, &stream);
-    // check根据自己的需要处理
-    CHECK_RET(ret == 0, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
+    std::vector<float>& queryHostData, std::vector<float>& keyHostData, std::vector<float>& cosHostData, std::vector<float>& sinHostData, float* dst ,aclrtContext &context, aclrtStream &stream){
     // 2. 构造输入与输出，需要根据API的接口定义构造
     int64_t layout = 1;
+
+    std::cout<< "Start RoPE"<<std::endl;
+    // std::cout<< "HERE IS SLO ************************************"<<std::endl;
 
     void* queryDeviceAddr = nullptr;
     void* keyDeviceAddr = nullptr;
@@ -28,7 +23,7 @@ int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keySha
     aclTensor* sin = nullptr;
 
     // 创建query aclTensor
-    ret = CreateAclTensor(queryHostData, queryShape, &queryDeviceAddr, aclDataType::ACL_FLOAT, &query);
+    auto ret = CreateAclTensor(queryHostData, queryShape, &queryDeviceAddr, aclDataType::ACL_FLOAT, &query);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     // 创建key aclTensor
     ret = CreateAclTensor(keyHostData, keyShape, &keyDeviceAddr, aclDataType::ACL_FLOAT, &key);
@@ -45,6 +40,7 @@ int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keySha
     aclOpExecutor* executor;
     // 调用aclnnApplyRotaryPosEmb第一段接口
     ret = aclnnApplyRotaryPosEmbGetWorkspaceSize(query, key, cos, sin, layout, &workspaceSize, &executor);
+    // std::cout<< aclGetRecentErrMsg()<<std::endl;
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnApplyRotaryPosEmbGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
     // 根据第一段接口计算出的workspaceSize申请device内存
     void* workspaceAddr = nullptr;
@@ -66,18 +62,21 @@ int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keySha
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
 
     for (int64_t i = 0; i < size; i++) {
-        LOG_PRINT("result[%ld] is: %hhu\n", i, resultData[i]);
+        LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
     }
+    std::copy(resultData.data(), resultData.data() + resultData.size(), dst);
 
-    auto size1 = GetShapeSize(keyShape);
-    std::vector<float> resultData1(size, 0);
-    ret = aclrtMemcpy(resultData1.data(), resultData1.size() * sizeof(resultData1[0]), keyDeviceAddr, size1 * sizeof(float),
-                      ACL_MEMCPY_DEVICE_TO_HOST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
 
-    for (int64_t i = 0; i < size; i++) {
-        LOG_PRINT("result[%ld] is: %hhu\n", i, resultData[i]);
-    }
+
+    // auto size1 = GetShapeSize(keyShape);
+    // std::vector<float> resultData1(size, 0);
+    // ret = aclrtMemcpy(resultData1.data(), resultData1.size() * sizeof(resultData1[0]), keyDeviceAddr, size1 * sizeof(float),
+    //                   ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return ret);
+
+    // for (int64_t i = 0; i < size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData1[i]);
+    // }
 
     // 6. 释放aclTensor和aclScalar，需要根据具体API的接口定义修改
     aclDestroyTensor(query);
@@ -93,10 +92,6 @@ int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keySha
     if (workspaceSize > 0) {
       aclrtFree(workspaceAddr);
     }
-    aclrtDestroyStream(stream);
-    aclrtDestroyContext(context);
-    aclrtResetDevice(deviceId);
-    aclFinalize();
 
     return 0;
 }
@@ -132,5 +127,5 @@ void aclnnRoPETest(){
                                       100, 20, 97, 119, 10, 4, 53, 13, 46, 82, 103, 119, 124, 80, 23, 67, 78, 56, 119, 122, 40,
                                       58, 128, 27, 30, 52, 71, 42, 123, 69, 4, 5, 116, 97, 38, 107, 8, 4, 65, 120, 40, 22, 60,
                                       44, 48, 66, 68, 125, 4, 93, 112, 112, 113, 90, 94, 23, 104, 39, 85, 84, 64, 128, 96, 119};
-    int ret = aclnnRoPEFunc(queryShape, keyShape, cosShape, sinShape, queryHostData, keyHostData, cosHostData, sinHostData);
+    //int ret = aclnnRoPEFunc(queryShape, keyShape, cosShape, sinShape, queryHostData, keyHostData, cosHostData, sinHostData);
 }

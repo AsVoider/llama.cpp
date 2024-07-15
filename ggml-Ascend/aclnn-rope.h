@@ -5,7 +5,8 @@
 #include <vector>
 
 int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keyShape, std::vector<int64_t>& cosShape, std::vector<int64_t>& sinShape, 
-    std::vector<float>& queryHostData, std::vector<float>& keyHostData, std::vector<float>& cosHostData, std::vector<float>& sinHostData );
+    std::vector<float>& queryHostData, std::vector<float>& keyHostData, std::vector<float>& cosHostData, std::vector<float>& sinHostData, float* dst ,aclrtContext &context, aclrtStream &stream);
+
 
 void aclnnRoPETest();
 
