@@ -289,7 +289,7 @@ GGML_CALL static void ggml_backend_ascend_buffer_set_tensor(ggml_backend_buffer_
     ggml_ascend_set_device(ctx->device);
 
     // todo Check: fixed
-    auto ret = aclrtMemcpy((char *)tensor->data, offset, data, size, ACL_MEMCPY_HOST_TO_DEVICE);
+    auto ret = aclrtMemcpy((char *)tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpy failed at [ggml_backend_ascend_buffer_set_tensor]: %d\n", ret); return);
 }
 
