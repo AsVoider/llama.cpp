@@ -20,16 +20,47 @@ int aclnn_add_func(void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
     aclScalar* alpha = nullptr;
     aclTensor* out = nullptr;
 
-    float alphaValue = 1.0f;
-
     ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = create_acl_tensor(otherShape, otherDataType, &otherDataAddr, &other);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    alpha = aclCreateScalar(&alphaValue, aclDataType::ACL_FLOAT);
-    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    
+    aclFloat16 alphaValue_f16 = aclFloatToFloat16(1.0f);
+    float alphaValue_f32 = 1.0f;
+    double alphaValue_f64 = 1.0;
+    int8_t alphaValue_i8 = 1;
+    int16_t alphaValue_i16 = 1;
+    int32_t alphaValue_i32 = 1;
+    int64_t alphaValue_i64 = 1;
+
+    switch(outDataType) {
+      case ACL_FLOAT16:
+        alpha = aclCreateScalar(&alphaValue_f16, aclDataType::ACL_FLOAT16);
+        break;
+      case ACL_FLOAT:
+        alpha = aclCreateScalar(&alphaValue_f32, aclDataType::ACL_FLOAT);
+        break;
+      case ACL_DOUBLE:
+        alpha = aclCreateScalar(&alphaValue_f64, aclDataType::ACL_DOUBLE);
+        break;
+      case ACL_INT8:
+        alpha = aclCreateScalar(&alphaValue_i8, aclDataType::ACL_INT8);
+        break;
+      case ACL_INT16:
+        alpha = aclCreateScalar(&alphaValue_i16, aclDataType::ACL_INT16);
+        break;
+      case ACL_INT32:
+        alpha = aclCreateScalar(&alphaValue_i32, aclDataType::ACL_INT32);
+        break;
+      case ACL_INT64:
+        alpha = aclCreateScalar(&alphaValue_i64, aclDataType::ACL_INT64);
+        break;
+      default:
+        LOG_PRINT("Unsupported data type\n");
+        return -1;
+    }
 
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor;

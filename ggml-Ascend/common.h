@@ -79,6 +79,18 @@ struct ggml_graph_node_properties {
     void * src_address[GGML_MAX_SRC];
 };
 
+template <typename T>
+int data_addr_malloc(const aclnn_shape_t& shape, const std::vector<T>& hostData, void** deviceAddr) {
+    auto size = GetShapeSize(shape) * sizeof(T);
+    // 调用aclrtMalloc申请device侧内存
+    auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
+    // 调用aclrtMemcpy将host侧数据拷贝到device侧内存上
+    ret = aclrtMemcpy(*deviceAddr, size, hostData.data(), size, ACL_MEMCPY_HOST_TO_DEVICE);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
+    return 0;
+}
+
 template<typename T>
 struct ggml_ascend_pool_alloc {
     ggml_ascend_pool * pool = nullptr;
