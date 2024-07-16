@@ -5,6 +5,55 @@
 #include "aclnn-rope.h"
 #include "common.h"
 
+int aclnn_rope_func(void* queryDataAddr, void* keyDataAddr, void* cosDataAddr, void* sinDataAddr,
+    aclnn_shape_t& queryShape, aclnn_shape_t& keyShape, aclnn_shape_t& cosShape, aclnn_shape_t& sinShape,
+    aclDataType queryDataType, aclDataType keyDataType, aclDataType cosDataType, aclDataType sinDataType,
+    aclrtStream &stream) {
+    
+    auto ret = 0;
+
+    aclTensor* query = nullptr;
+    aclTensor* key = nullptr;
+    aclTensor* cos = nullptr;
+    aclTensor* sin = nullptr;
+
+    ret = create_acl_tensor(queryShape, queryDataType, &queryDataAddr, &query);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = create_acl_tensor(keyShape, keyDataType, &keyDataAddr, &key);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = create_acl_tensor(cosShape, cosDataType, &cosDataAddr, &cos);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = create_acl_tensor(sinShape, sinDataType, &sinDataAddr, &sin);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+    int64_t layout = 1;
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor;
+
+    ret = aclnnApplyRotaryPosEmbGetWorkspaceSize(query, key, cos, sin, layout, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnApplyRotaryPosEmbGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    void* workspaceAddr = nullptr;
+    if (workspaceSize > 0) {
+        ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret;);
+    }
+    ret = aclnnApplyRotaryPosEmb(workspaceAddr, workspaceSize, executor, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnApplyRotaryPosEmb failed. ERROR: %d\n", ret); return ret);
+    ret = aclrtSynchronizeStream(stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+    aclDestroyTensor(query);
+    aclDestroyTensor(key);
+    aclDestroyTensor(cos);
+    aclDestroyTensor(sin);
+
+    if(workspaceSize > 0) {
+        aclrtFree(workspaceAddr);
+    }
+
+    return 0;
+}
+
 int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keyShape, std::vector<int64_t>& cosShape, std::vector<int64_t>& sinShape, 
     std::vector<float>& queryHostData, std::vector<float>& keyHostData, std::vector<float>& cosHostData, std::vector<float>& sinHostData, float* dst ,aclrtContext &context, aclrtStream &stream){
     // 2. 构造输入与输出，需要根据API的接口定义构造

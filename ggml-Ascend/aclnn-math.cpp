@@ -1,9 +1,56 @@
 #include "aclnn-math.h"
 #include "common.h"
+#include "acl/acl.h"
 #include "aclnnop/aclnn_pow.h"
 #include "aclnnop/aclnn_sin.h"
 #include "aclnnop/aclnn_cos.h"
 
+template <typename T>
+int aclnn_pow_scalar_tensor_func(T selfValue, void* exponentDataAddr, void* outDataAddr,
+  aclnn_shape_t& exponentShape, aclnn_shape_t& outShape,
+  aclDataType selfDataType, aclDataType exponentDataType, aclDataType outDataType,
+  aclrtStream &stream) {
+  
+  auto ret = 0;
+
+  aclScalar* self = nullptr;
+  aclTensor* exponent = nullptr;
+  aclTensor* out = nullptr;
+
+  ret = create_acl_tensor(exponentShape, exponentDataType, &exponentDataAddr, &exponent);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  self = aclCreateScalar(&selfValue, selfDataType);
+
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor;
+
+  ret = aclnnPowScalarTensorGetWorkspaceSize(self, exponent, out, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnPowScalarTensorGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+    ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+  ret = aclnnPowScalarTensor(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnPowScalarTensor failed. ERROR: %d\n", ret); return ret);
+
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  aclDestroyScalar(self);
+  aclDestroyTensor(exponent);
+  aclDestroyTensor(out);
+
+  if (workspaceSize > 0) {
+    aclrtFree(workspaceAddr);
+  }
+
+  return 0;
+}
+
+template int aclnn_pow_scalar_tensor_func<float>(float, void*, void*, aclnn_shape_t&, aclnn_shape_t&, aclDataType, aclDataType, aclDataType, aclrtStream&);
 
 int aclnnPowScalarTensorFunc(std::vector<int64_t>& exponentShape, std::vector<int64_t> &outShape,
   std::vector<float> &exponentHostData, std::vector<float>& outHostData, float selfValue, float* dst ,aclrtContext &context, aclrtStream &stream){
@@ -69,7 +116,44 @@ int aclnnPowScalarTensorFunc(std::vector<int64_t>& exponentShape, std::vector<in
   return 0;
 }
 
+int aclnn_sin_func(void* selfDataAddr, void* outDataAddr,
+  aclnn_shape_t& selfShape, aclnn_shape_t& outShape,
+  aclDataType selfDataType, aclDataType outDataType,
+  aclrtStream &stream) {
+  
+  auto ret = 0;
 
+  aclTensor* self = nullptr;
+  aclTensor* out = nullptr;
+
+  ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor;
+  ret = aclnnSinGetWorkspaceSize(self, out, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSinGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+    ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+  ret = aclnnSin(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSin failed. ERROR: %d\n", ret); return ret);
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  aclDestroyTensor(self);
+  aclDestroyTensor(out);
+
+  if (workspaceSize > 0) {
+    aclrtFree(workspaceAddr);
+  }
+
+  return 0;
+}
 
 int aclnnSinFunc( std::vector<int64_t> &selfShape,
   std::vector<int64_t> &outShape,
@@ -130,6 +214,45 @@ int aclnnSinFunc( std::vector<int64_t> &selfShape,
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
   }
+  return 0;
+}
+
+int aclnn_cos_func(void* selfDataAddr, void* outDataAddr,
+  aclnn_shape_t& selfShape, aclnn_shape_t& outShape,
+  aclDataType selfDataType, aclDataType outDataType,
+  aclrtStream &stream) {
+  
+  auto ret = 0;
+
+  aclTensor* self = nullptr;
+  aclTensor* out = nullptr;
+
+  ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor;
+  ret = aclnnCosGetWorkspaceSize(self, out, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCosGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+    ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+  ret = aclnnCos(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnCos failed. ERROR: %d\n", ret); return ret);
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  aclDestroyTensor(self);
+  aclDestroyTensor(out);
+
+  if (workspaceSize > 0) {
+    aclrtFree(workspaceAddr);
+  }
+
   return 0;
 }
 

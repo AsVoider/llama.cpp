@@ -215,7 +215,54 @@ int aclnnGroupNormFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& ga
 
 }
 
+int aclnn_rms_norm_func(void* xDataAddr, void* gammaDataAddr, void* yDataAddr, void* rstdDataAddr,
+  aclnn_shape_t& xShape, aclnn_shape_t& gammaShape, aclnn_shape_t& yShape, aclnn_shape_t& rstdShape,
+  aclDataType xDataType, aclDataType gammaDataType, aclDataType yDataType, aclDataType rstdDataType,
+  float epsilon, aclrtStream &stream) {
+  
+  auto ret = 0;
 
+  aclTensor* x = nullptr;
+  aclTensor* gamma = nullptr;
+  aclTensor* y = nullptr;
+  aclTensor* rstd = nullptr;
+
+  ret = create_acl_tensor(xShape, xDataType, &xDataAddr, &x);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(gammaShape, gammaDataType, &gammaDataAddr, &gamma);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(yShape, yDataType, &yDataAddr, &y);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(rstdShape, rstdDataType, &rstdDataAddr, &rstd);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor;
+
+  ret = aclnnRmsNormGetWorkspaceSize(x, gamma, epsilon, y, rstd, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnRmsNormGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+    ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+  ret = aclnnRmsNorm(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnRmsNorm failed. ERROR: %d\n", ret); return ret);
+
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+  
+  aclDestroyTensor(x);
+  aclDestroyTensor(gamma);
+  aclDestroyTensor(y);
+  aclDestroyTensor(rstd);
+
+  if (workspaceSize > 0) {
+    aclrtFree(workspaceAddr);
+  }
+
+  return 0;
+}
 
 int aclnnRmsNormFunc( std::vector<int64_t>& xShape,
   std::vector<int64_t>& gammaShape,
