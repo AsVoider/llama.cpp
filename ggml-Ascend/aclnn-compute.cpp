@@ -5,6 +5,7 @@
 #include "aclnn-mul.h"
 #include "aclnn-cpy.h"
 #include "aclnn-unary.h"
+#include "aclnn-comp.h"
 #include "../../../../../Ascend/ascend-toolkit/8.0.RC2.alpha003/toolkit/toolchain/hcc/sysroot/usr/include/string.h"
 #include "aclnn-norm.h"
 #include "aclnn-math.h"
@@ -165,7 +166,77 @@ void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 }
 
 void ggml_ascend_soft_max(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
+    ggml_tensor* src0 = dst->src[0];
+    ggml_tensor* src1 = dst->src[1];
+    aclrtStream stream = ctx.stream();
 
+    GGML_TENSOR_BINARY_OP_LOCALS
+
+    void* mulsSelfDeviceAddr = src0->data;
+    void* mulsOutDeviceAddr = nullptr;
+    float scale = dst->op_params[0];
+    aclnn_shape_t mulsSelfShape = {ne00, ne01, ne02, ne03};
+    aclnn_shape_t mulsOutShape = mulsSelfShape;
+    std::vector<float> mulsOutHostData(ne00 * ne01 * ne02 * ne03, 0);
+    auto ret = data_addr_malloc(mulsOutShape, mulsOutHostData, &mulsOutDeviceAddr);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    ret = aclnn_muls_func(mulsSelfDeviceAddr, mulsOutDeviceAddr, mulsSelfShape, mulsOutShape, ACL_FLOAT, ACL_FLOAT, scale, stream);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    // LOG_PRINT("\nmulsOut: \n");
+    // auto tmp_size = GetShapeSize(mulsOutShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), mulsOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
+    void* addSelfDeviceAddr = mulsOutDeviceAddr;
+    void* addOtherDeviceAddr = src1->data;
+    void* addOutDeviceAddr = nullptr;
+    aclnn_shape_t addSelfShape = mulsOutShape;
+    aclnn_shape_t addOtherShape = {ne10, ne01, ne12, ne13};
+    aclnn_shape_t addOutShape = {
+        (addSelfShape[0] > addOtherShape[0]) ? addSelfShape[0] : addOtherShape[0],
+        (addSelfShape[1] > addOtherShape[1]) ? addSelfShape[1] : addOtherShape[1],
+        (addSelfShape[2] > addOtherShape[2]) ? addSelfShape[2] : addOtherShape[2],
+        (addSelfShape[3] > addOtherShape[3]) ? addSelfShape[3] : addOtherShape[3]
+    };
+    std::vector<float> addOutHostData(addOutShape[0] * addOutShape[1] * addOutShape[2] * addOutShape[3], 0);
+    ret = data_addr_malloc(addOutShape, addOutHostData, &addOutDeviceAddr);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    ret = aclnn_add_func(addSelfDeviceAddr, addOtherDeviceAddr, addOutDeviceAddr,
+                        addSelfShape, addOtherShape, addOutShape,
+                        ACL_FLOAT, ggml_to_acl_map[src1->type], ACL_FLOAT,
+                        stream);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    // LOG_PRINT("\naddOut: \n");
+    // auto tmp_size = GetShapeSize(addOutShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), addOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
+    void* softMaxSelfDeviceAddr = addOutDeviceAddr;
+    void* softMaxOutDeviceAddr = dst->data;
+    aclnn_shape_t softMaxSelfShape = addOutShape;
+    aclnn_shape_t softMaxOutShape = softMaxSelfShape;
+    ret = aclnn_soft_max_func(softMaxSelfDeviceAddr, softMaxOutDeviceAddr,
+                            softMaxSelfShape, softMaxOutShape,
+                            ACL_FLOAT, ACL_FLOAT,
+                            stream);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    aclrtFree(mulsOutDeviceAddr);
+    aclrtFree(addOutDeviceAddr);
 }
 
 void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, ggml_tensor *src1, ggml_tensor *dst) {
@@ -205,6 +276,7 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     float cos_d[size];
 
     float theta_scale = pow(freq_base, -2.0 / n_dims);
+    // LOG_PRINT("theta_scale: %f\n", theta_scale);
 
     std::vector<float> powExpHostData(ne[0]/2, 0);
     std::vector<float> powOutData = powExpHostData;
@@ -225,6 +297,16 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
         ACL_FLOAT, ACL_FLOAT, ACL_FLOAT,
         stream);
     CHECK_RET(ret == ACL_SUCCESS, return);
+
+    // LOG_PRINT("\npowOut: \n");
+    // auto tmp_size = GetShapeSize(powOutShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), powOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
 
     void* mulOtherDeviceAddr = nullptr;
     ret = aclrtMalloc(&mulOtherDeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
@@ -275,6 +357,16 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
                         stream);
     CHECK_RET(ret == ACL_SUCCESS, return);
 
+    // LOG_PRINT("\nmulOut: \n");
+    // auto tmp_size = GetShapeSize(mulOutShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), mulOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
     // ret = aclnnMulFunc(mulSelfShape, mulOtherShape, mulOutShape, mulSelfHostData, mulOtherHostData, mulOutHostData, theta_base, context, stream);
 
     void* mulsOutDeviceAddr = nullptr;
@@ -296,6 +388,16 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     CHECK_RET(ret == ACL_SUCCESS, return);
     // ret = aclnnMulsFunc(mulsSelfHostData, mulsOutHostData, freq_scale, mulsSelfShape, mulsOutShape, theta, context, stream);
 
+    // LOG_PRINT("\nmulsOut: \n");
+    // auto tmp_size = GetShapeSize(mulsOutShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), mulsOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
     void* sinSelfDeviceAddr = mulsOutDeviceAddr;
     void* sinOutDeviceAddr = nullptr;
     aclnn_shape_t sinSelfShape = {size, 1};
@@ -316,6 +418,16 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     CHECK_RET(ret == ACL_SUCCESS, return);
     // ret = aclnnSinFunc(sinSelfShape, sinShape, sinSelfHostData, sinHostData, sin_d, context, stream);
 
+    // LOG_PRINT("\nsinOut: \n");
+    // auto tmp_size = GetShapeSize(sinOutShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), sinOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
     void* cosSelfDeviceAddr = mulsOutDeviceAddr;
     void* cosOutDeviceAddr = nullptr;
     aclnn_shape_t cosSelfShape = {size, 1};
@@ -328,6 +440,16 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ret = aclnn_cos_func(cosSelfDeviceAddr, cosOutDeviceAddr, cosSelfShape, cosOutShape, ACL_FLOAT, ACL_FLOAT, stream);
     CHECK_RET(ret == ACL_SUCCESS, return);
     // ret = aclnnCosFunc(cosSelfShape, cosShape, cosSelfHostData, cosHostData, cos_d, context, stream);
+
+    // LOG_PRINT("\ncosOut: \n");
+    // auto tmp_size = GetShapeSize(cosOutShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), cosOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
 
     void* queryDeviceAddr = src0->data;
     void* keyDeviceAddr = dst->data;
