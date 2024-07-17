@@ -612,7 +612,7 @@ GGML_CALL static void ggml_backend_ascend_set_tensor_async(ggml_backend_t backen
     auto buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
     GGML_ASSERT(buf->buft == ggml_backend_ascend_buffer_type(ctx->device) && "unsupport buffer type");
-    // todo Check
+    // todo Check: fixed
     auto ret = aclrtMemcpyAsync((char *)tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE, ctx->stream());
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpyAsync failed at [ggml_backend_ascend_set_tensor_async]: %d\n", ret); return);
 }
@@ -622,7 +622,7 @@ GGML_CALL static void ggml_backend_ascend_get_tensor_async(ggml_backend_t backen
     auto buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
     GGML_ASSERT(buf->buft == ggml_backend_ascend_buffer_type(ctx->device) && "unsupported buffer type");
-    // todo Check
+    // todo Check: fixed
     auto ret = aclrtMemcpyAsync(data, size, (const char *)tensor->data + offset, size, ACL_MEMCPY_DEVICE_TO_HOST, ctx->stream());
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpyAsync failed at [ggml_backend_ascend_get_tensor_async]: %d\n", ret); return);
 }
