@@ -33,6 +33,7 @@ printf(message, ##__VA_ARGS__); \
 void ggml_ascend_error(const char * stmt, const char * func, const char * file, int line, const char * msg);
 
 #define aclnn_shape_t std::vector<int64_t>
+#define aclnn_float_data_t std::vector<float>
 
 extern aclDataType ggml_to_acl_map[GGML_TYPE_COUNT];
 

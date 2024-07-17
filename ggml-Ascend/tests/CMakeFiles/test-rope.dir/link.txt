@@ -1,0 +1,1 @@
+/usr/bin/g++ -O3 -DNDEBUG "CMakeFiles/test-rope.dir/test-rope.cpp.o" "CMakeFiles/test-rope.dir/get-model.cpp.o" -o ../bin/test-rope  ../common/libcommon.a ../libllama.a /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.so -pthread 

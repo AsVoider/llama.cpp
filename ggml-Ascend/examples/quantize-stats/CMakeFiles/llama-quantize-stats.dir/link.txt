@@ -1,0 +1,1 @@
+/usr/bin/g++ -O3 -DNDEBUG "CMakeFiles/llama-quantize-stats.dir/quantize-stats.cpp.o" "../../common/CMakeFiles/build_info.dir/build-info.cpp.o" -o ../../bin/llama-quantize-stats  ../../libllama.a -pthread -pthread /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.so 

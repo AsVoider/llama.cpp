@@ -1,0 +1,1 @@
+/usr/bin/g++ -O3 -DNDEBUG "CMakeFiles/test-llama-grammar.dir/test-llama-grammar.cpp.o" "CMakeFiles/test-llama-grammar.dir/get-model.cpp.o" -o ../bin/test-llama-grammar  ../common/libcommon.a ../libllama.a /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.so -pthread 

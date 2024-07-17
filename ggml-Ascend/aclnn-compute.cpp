@@ -1,8 +1,11 @@
 #include "aclnn-compute.h"
+#include "aclnn-comp.h"
+#include "string.h"
 #include "aclnn-add.h"
 #include "aclnn-mul.h"
 #include "aclnn-cpy.h"
 #include "aclnn-unary.h"
+#include "../../../../../Ascend/ascend-toolkit/8.0.RC2.alpha003/toolkit/toolchain/hcc/sysroot/usr/include/string.h"
 
 void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ggml_tensor* src0 = dst->src[0];
@@ -112,16 +115,4 @@ void ggml_ascend_silu(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
                             srcShape, dstShape,
                             ggml_to_acl_map[src->type], ggml_to_acl_map[dst->type],
                             stream);
-}
-
-void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
-    ggml_tensor* src0 = dst->src[0];
-    aclrtStream stream = ctx.stream();
-
-    aclnn_shape_t xShape = {src0->ne[3], src0->ne[2], src0->ne[1], src0->ne[0]};
-    aclnn_shape_t gammaShape = {src->ne[0]};
-    aclnn_shape_t yShape = xShape;
-    aclnn_shape_t rstdShape = {src->ne[0], 1};
-
-    int ret = 
 }

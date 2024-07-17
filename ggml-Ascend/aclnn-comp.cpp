@@ -7,6 +7,45 @@
 #include "aclnnop/aclnn_softmax.h"
 
 
+int acl_soft_max_func(void* selfDataAddr, void* outDataAddr, aclnn_shape_t& selfShape, aclnn_shape_t& outShape,
+  aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
+  aclrtStream &stream){
+
+  aclTensor* self = nullptr;
+  aclTensor* out = nullptr;
+  auto ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor;
+  int64_t dim = 0;
+
+  ret = aclnnSoftmaxGetWorkspaceSize(self, dim, out, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSoftmaxGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+    ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+  ret = aclnnSoftmax(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnSoftmax failed. ERROR: %d\n", ret); return ret);
+
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  aclDestroyTensor(self);
+  aclDestroyTensor(out);
+  if (workspaceSize > 0) {
+    aclrtFree(workspaceAddr);
+  }
+  return 0;
+}
+
+
 int aclnnSoftMaxFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream ){
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfDeviceAddr = nullptr;

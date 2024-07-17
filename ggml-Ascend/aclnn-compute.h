@@ -30,5 +30,16 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
 
 void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, ggml_tensor *src1, ggml_tensor *dst);
 
+void ggml_ascend_silu_test(int64_t lens, int64_t width, float* data, int32_t deviceId, aclrtStream stream);
+
+void ggml_ascend_cpy_test(int64_t* ne, float* data, int32_t deviceId, aclrtStream stream);
+
+void ggml_ascend_dup_test(int64_t* ne, float* data, int32_t deviceId, aclrtStream stream);
+
+void ggml_ascend_add_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2, int32_t deviceId, aclrtStream stream);
+
+void ggml_ascend_mul_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2, int32_t deviceId, aclrtStream stream);
+
+void ggml_ascend_get_rows_test(int64_t*ne1, int64_t*ne2, float* data1, int64_t* data2, int32_t deviceId, aclrtStream stream);
 
 #endif

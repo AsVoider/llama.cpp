@@ -1,0 +1,1 @@
+/usr/bin/g++ -O3 -DNDEBUG "CMakeFiles/test-chat-template.dir/test-chat-template.cpp.o" "CMakeFiles/test-chat-template.dir/get-model.cpp.o" -o ../bin/test-chat-template  ../common/libcommon.a ../libllama.a /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.so -pthread 

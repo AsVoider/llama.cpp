@@ -4,6 +4,7 @@
 #include <iostream>
 #include <vector>
 #include "acl/acl.h"
+#include "common.h"
 
 int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
     aclnn_shape_t& selfRefShape, aclnn_shape_t& srcShape,
@@ -24,5 +25,7 @@ int aclnnGetRowsFunc(std::vector<int64_t> &selfShape,
   std::vector<float> &selfHostData,
   std::vector<int> &indexHostData,
   std::vector<float> &outHostData,float* dst, aclrtContext &context, aclrtStream &stream);
+
+void aclnn_cpy_func_test(int64_t* ne, float* data, int32_t deviceId, aclrtStream stream);
 
 #endif

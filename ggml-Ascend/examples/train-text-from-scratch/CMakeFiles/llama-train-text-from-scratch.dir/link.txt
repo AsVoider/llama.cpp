@@ -1,0 +1,1 @@
+/usr/bin/g++ -O3 -DNDEBUG "CMakeFiles/llama-train-text-from-scratch.dir/train-text-from-scratch.cpp.o" -o ../../bin/llama-train-text-from-scratch  ../../common/libcommon.a ../../libllama.a -pthread /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.so -pthread 
