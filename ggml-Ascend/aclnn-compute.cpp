@@ -269,11 +269,11 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
     int64_t size = ne[0] * ne[1] * ne[2] * ne[3];
 
-    float theta_scale_pow[ne[0] / 2];
-    float theta_base[size];
-    float theta[size];
-    float sin_d[size];
-    float cos_d[size];
+    // float theta_scale_pow[ne[0] / 2];
+    // float theta_base[size];
+    // float theta[size];
+    // float sin_d[size];
+    // float cos_d[size];
 
     float theta_scale = pow(freq_base, -2.0 / n_dims);
     // LOG_PRINT("theta_scale: %f\n", theta_scale);
@@ -282,9 +282,9 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     std::vector<float> powOutData = powExpHostData;
     aclnn_shape_t powExpShape = {ne[0]/2, 1};
     aclnn_shape_t powOutShape = powExpShape;
-    std::generate_n(powExpHostData.begin(), powExpHostData.size(), [&, index = 0]() mutable {
-        return index++;
-    });
+    for(decltype(powExpHostData.size()) i(0); i < powExpHostData.size(); i++){
+        powExpHostData[i] = i;
+    }
     void* powExpDeviceAddr = nullptr;
     void* powOutDeviceAddr = nullptr;
     int ret = data_addr_malloc(powExpShape, powExpHostData, &powExpDeviceAddr);
@@ -312,7 +312,7 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ret = aclrtMalloc(&mulOtherDeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, return);
     for (int i = 0; i < size; i += ne[0] / 2) {
-        ret = aclrtMemcpy(mulOtherDeviceAddr + i * sizeof(float), ne[0] / 2 * sizeof(float), powOutDeviceAddr, ne[0] / 2 * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
+        ret = aclrtMemcpy((void *)((float *)mulOtherDeviceAddr + i), ne[0] / 2 * sizeof(float), powOutDeviceAddr, ne[0] / 2 * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
         CHECK_RET(ret == ACL_SUCCESS, return);
     }
 
@@ -338,7 +338,7 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ret = aclrtMalloc(&mulSelfDeviceAddr, size * sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, return);
     for (int i = 0; i < size; i += ne[2]) {
-        ret = aclrtMemcpy(mulSelfDeviceAddr + i * sizeof(int32_t), ne[2] * sizeof(int32_t), pos, ne[2] * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_DEVICE);
+        ret = aclrtMemcpy((void *)((int32_t *)mulSelfDeviceAddr + i), ne[2] * sizeof(int32_t), pos, ne[2] * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_DEVICE);
         CHECK_RET(ret == ACL_SUCCESS, return);
     }
 

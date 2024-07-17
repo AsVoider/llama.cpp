@@ -5488,7 +5488,7 @@ static bool llm_load_tensors(
 
 #ifdef GGML_USE_ASCEND
     auto init_res = ggml_backend_ascend_device_init();
-    if (!init_ret) {
+    if (!init_res) {
         printf("Error While Init Ascend\n");
         exit(1);
     }
