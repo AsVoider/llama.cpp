@@ -9,7 +9,7 @@
 #include "common.h"
 
 int aclnn_add_func(void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
-	aclnn_shape_t& selfShape, aclnn_shape_t& otherShape, aclnn_shape_t& outShape,
+	  aclnn_shape_t& selfShape, aclnn_shape_t& otherShape, aclnn_shape_t& outShape,
     aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
     aclrtStream &stream) {
     
