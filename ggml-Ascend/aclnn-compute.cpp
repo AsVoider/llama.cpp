@@ -182,6 +182,7 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
 }
 
 void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
+
     ggml_tensor* src0 = dst->src[0];
     ggml_tensor* src1 = dst->src[1];
     aclrtStream stream = ctx.stream();
@@ -249,10 +250,10 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ret = data_addr_malloc(mulOutShape, mulOutHostData, &mulOutDeviceAddr);
     CHECK_RET(ret == ACL_SUCCESS, return);
 
-    ret = aclrtMalloc(&mulSelfDeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
+    ret = aclrtMalloc(&mulSelfDeviceAddr, size * sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, return);
     for (int i = 0; i < size; i += ne[2]) {
-        ret = aclrtMemcpy(mulSelfDeviceAddr + i * sizeof(float), ne[2] * sizeof(float), pos, ne[2] * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
+        ret = aclrtMemcpy(mulSelfDeviceAddr + i * sizeof(int32_t), ne[2] * sizeof(int32_t), pos, ne[2] * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_DEVICE);
         CHECK_RET(ret == ACL_SUCCESS, return);
     }
 
@@ -267,9 +268,10 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
     ret = aclnn_mul_func(mulSelfDeviceAddr, mulOtherDeviceAddr, mulOutDeviceAddr,
                         mulSelfShape, mulOtherShape, mulOutShape,
-                        ACL_FLOAT, ACL_FLOAT, ACL_FLOAT,
+                        ACL_INT32, ACL_FLOAT, ACL_FLOAT,
                         stream);
     CHECK_RET(ret == ACL_SUCCESS, return);
+
     // ret = aclnnMulFunc(mulSelfShape, mulOtherShape, mulOutShape, mulSelfHostData, mulOtherHostData, mulOutHostData, theta_base, context, stream);
 
     void* mulsOutDeviceAddr = nullptr;
@@ -337,6 +339,9 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
                         queryShape, keyShape, cosShapeRp, sinShapeRp,
                         ACL_FLOAT, ACL_FLOAT, ACL_FLOAT, ACL_FLOAT,
                         stream);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    ret = aclrtMemcpy(keyDeviceAddr, size * sizeof(float), queryDeviceAddr, size * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, return);
     // ret = aclnnRoPEFunc(queryShape, keyShape, cosShapeRp, sinShapeRp, queryHostData, keyHostData, cosQKHostData, sinQKHostData, dst, context, stream); 
 
