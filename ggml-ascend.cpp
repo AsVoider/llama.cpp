@@ -289,7 +289,7 @@ GGML_CALL static void ggml_backend_ascend_buffer_set_tensor(ggml_backend_buffer_
     ggml_ascend_set_device(ctx->device);
 
     // todo Check: fixed
-    auto ret = aclrtMemcpy((char *)tensor->data, offset, data, size, ACL_MEMCPY_HOST_TO_DEVICE);
+    auto ret = aclrtMemcpy((char *)tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpy failed at [ggml_backend_ascend_buffer_set_tensor]: %d\n", ret); return);
 }
 
@@ -747,11 +747,12 @@ GGML_CALL static enum ggml_status ggml_backend_ascend_graph_compute(ggml_backend
 
     bool use_graph = false;
     bool graph_update_required = false;
+    //GGML_UNUSED(graph_update_required);
 
     bool graph_evaluated_or_captured = false;
 
     while (!graph_evaluated_or_captured) {
-        if (!use_graph || graph_evaluated_or_captured) {
+        if (!use_graph || graph_update_required) {
             for (int i = 0; i < cgraph->n_nodes; i++) {
                 ggml_tensor * node = cgraph->nodes[i];
 
@@ -784,6 +785,7 @@ GGML_CALL static enum ggml_status ggml_backend_ascend_graph_compute(ggml_backend
 // todo !!!!! marked: fixed
 GGML_CALL static bool ggml_backend_ascend_supports_op(ggml_backend_t backend, const ggml_tensor * op) {
     auto ascend_ctx = (ggml_backend_ascend_context *)backend->context;
+    GGML_UNUSED(ascend_ctx);
     switch (op->op) {
     case GGML_OP_UNARY:
         switch (ggml_get_unary_op(op)) {
@@ -908,6 +910,7 @@ GGML_CALL static bool ggml_backend_ascend_offload_op(ggml_backend_t backend, con
 // todo event is optional: marked
 static ggml_backend_event_t ggml_backend_ascend_event_new(ggml_backend_t backend) {
     // todo no peer copy: marked
+    GGML_UNUSED(backend);
     return nullptr;
 }
 
@@ -991,4 +994,8 @@ GGML_CALL ggml_backend_t ggml_backend_ascend_init(int device) {
     };
 
     return ascend_backend;
+}
+
+GGML_CALL bool ggml_backend_is_ascend(ggml_backend_t backend) {
+    return backend != NULL && ggml_guid_matches(backend->guid, ggml_backend_ascend_guid());
 }

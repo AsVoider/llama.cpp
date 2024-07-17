@@ -171,6 +171,12 @@ int aclnn_muls_func(void* selfDataAddr, void* outDataAddr,
 int aclnnMulsFunc(std::vector<float>& selfHostData, std::vector<float>& outHostData, float otherValue, std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape ,float* dst, aclrtContext &context, aclrtStream &stream){
 
 
+  for(int i=0; i<16; i++){
+    std::cout<<selfHostData[i]<<" ";
+  }
+  std::cout<<otherValue;
+
+
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfDeviceAddr = nullptr;
   void* outDeviceAddr = nullptr;

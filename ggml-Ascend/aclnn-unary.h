@@ -10,6 +10,8 @@ int aclnn_silu_func(void* selfDataAddr, void* outDataAddr,
     aclDataType selfDataType, aclDataType outDataType,
     aclrtStream &stream);
 
+void aclnn_silu_func_test(int64_t lens, int64_t width, float* data, int32_t deviceId, aclrtStream stream);
+
 int aclnnSigmoidFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst);
 
 int aclnnHardSigmoidFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst);

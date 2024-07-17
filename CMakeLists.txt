@@ -408,6 +408,26 @@ if (LLAMA_CUBLAS)
     set(LLAMA_CUDA ON)
 endif()
 
+if (LLAMA_ASCEND)
+    # CMake lowest version requirement
+    cmake_minimum_required(VERSION 3.14)
+    if(NOT "$ENV{ASCEND_CUSTOM_PATH}" STREQUAL "")      
+        set(ASCEND_PATH $ENV{ASCEND_CUSTOM_PATH})
+    else()
+        set(ASCEND_PATH "/home/powerinfer/Ascend/ascend-toolkit/latest")
+    endif()
+    set(ASCEND_INCLUDE_DIRS "${ASCEND_PATH}/include")
+    set(ASCEND_LIBRARIES ${ASCEND_PATH}/lib64/libascendcl.so
+                         ${ASCEND_PATH}/lib64/libnnopbase.so
+                         ${ASCEND_PATH}/lib64/libopapi.so)
+    set(LLAMA_EXTRA_LIBS     ${LLAMA_EXTRA_LIBS}     ${ASCEND_LIBRARIES})
+    set(LLAMA_EXTRA_INCLUDES ${LLAMA_EXTRA_INCLUDES} ${ASCEND_INCLUDE_DIRS})
+    add_compile_definitions(GGML_USE_ASCEND)
+    set(GGML_HEADERS_ASCEND ggml-ascend.h)
+    file(GLOB GGML_SOURCES_ASCEND "ggml-Ascend/*.cpp")
+    list(APPEND GGML_SOURCES_ASCEND "ggml-ascend.cpp")
+endif()
+
 if (LLAMA_CUDA)
     cmake_minimum_required(VERSION 3.18)  # for CMAKE_CUDA_ARCHITECTURES
 
@@ -1263,6 +1283,7 @@ add_library(ggml OBJECT
             ggml-backend.h
             ggml-quants.c
             ggml-quants.h
+            ${GGML_SOURCES_ASCEND}    ${GGML_HEADERS_ASCEND}
             ${GGML_SOURCES_CUDA}      ${GGML_HEADERS_CUDA}
             ${GGML_SOURCES_METAL}     ${GGML_HEADERS_METAL}
             ${GGML_SOURCES_RPC}       ${GGML_HEADERS_RPC}
@@ -1353,6 +1374,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/LlamaConfig.cmake
 
 set(GGML_PUBLIC_HEADERS "ggml.h" "ggml-alloc.h" "ggml-backend.h"
         "${GGML_HEADERS_CUDA}"
+        "${GGML_HEADERS_ASCEND}"
         "${GGML_HEADERS_METAL}"
         "${GGML_HEADERS_EXTRA}")
 

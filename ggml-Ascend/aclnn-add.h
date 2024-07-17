@@ -18,4 +18,6 @@ int aclnnAddFunc(std::vector<float>& selfHostData,std::vector<float>& otherHostD
 
 void aclnnAddTest();
 
+void aclnn_add_func_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2, int32_t deviceId, aclrtStream stream);
+
 #endif //ACLNNADD_H
