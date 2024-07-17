@@ -25,13 +25,29 @@ void aclnnSiluCompute(int64_t* ne, float* data, float* dst, aclrtContext &contex
   int ret = aclnnSiluFunc(selfShape, outShape, selfHostData, outHostData, dst, context, stream);
 }
 
-void aclnnSoftMaxCompute(int64_t* ne, float* data, float* dst, float scale, aclrtContext &context, aclrtStream &stream){
+void aclnnSoftMaxCompute(int64_t* ne, int64_t* ne2,float* data, float* mask ,float* dst, float scale, aclrtContext &context, aclrtStream &stream){
   std::vector<int64_t> selfShape = {ne[0], ne[1], ne[2], ne[3]};
   std::vector<int64_t> outShape = selfShape;
   std::vector<float> selfHostData(data, data + ne[3]*ne[2]*ne[1]*ne[0]);
   std::vector<float> outHostData(selfHostData.size(), 0);
   float dstTemp[ne[3]*ne[2]*ne[1]*ne[0]];
+  float dstTemp1[ne[3]*ne[2]*ne[1]*ne[0]];
   int ret = aclnnMulsFunc(selfHostData, outHostData, scale, selfShape , outShape, dstTemp, context, stream);
+  std::vector<int64_t> addSelfShape = selfShape;
+  std::vector<int64_t> addOtherShape = {ne2[0], ne[1], ne2[2], ne2[3]};
+  std::vector<int64_t> addOutShape = {
+    (addSelfShape[0] > addOtherShape[0]) ? addSelfShape[0] : addOtherShape[0],
+    (addSelfShape[1] > addOtherShape[1]) ? addSelfShape[1] :addOtherShape[1],
+    (addSelfShape[2] > addOtherShape[2]) ? addSelfShape[2] : addOtherShape[2],
+    (addSelfShape[3] > addOtherShape[3]) ? addSelfShape[3] : addOtherShape[3]
+  };
+  std::vector<float> addSelfHostData(dstTemp, dstTemp + ne[3]*ne[2]*ne[1]*ne[0]);
+  std::vector<float> addOtherHostData(mask, mask + addOtherShape[0]*  addOtherShape[1]*  addOtherShape[2]*  addOtherShape[3]);
+  std::vector<float> addOutHostData(addOutShape[0]* addOutShape[1]* addOutShape[2]* addOutShape[3], 0);
+  
+  ret = aclnnAddFunc(addSelfHostData, addOtherHostData, 1.0, addSelfShape, addOtherShape, addOutShape, dstTemp1, context, stream);
+
+
   std::vector<int64_t> selfShape1 = {ne[0], ne[1], ne[2], ne[3]};
   std::vector<int64_t> outShape1 = selfShape1;
   std::vector<float> selfHostData1(dstTemp, dstTemp + ne[3]*ne[2]*ne[1]*ne[0]);
@@ -66,7 +82,7 @@ void aclnnAddCompute(int64_t* ne1, int64_t* ne2,float* data1, float* data2, floa
   int ret = aclnnAddFunc(selfHostData, otherHostData,alphaValue, selfShape, otherShape, outShape, dst, context, stream);
 }
 
-void aclnnMulsCompute(int64_t* ne1, int64_t* ne2,float* data1, float* data2, float* dst, aclrtContext &context, aclrtStream &stream){
+void aclnnMulCompute(int64_t* ne1, int64_t* ne2,float* data1, float* data2, float* dst, aclrtContext &context, aclrtStream &stream){
   std::vector<float> selfHostData(data1, data1 + ne1[3]*ne1[2]*ne1[1]*ne1[0]);
   std::vector<float> otherHostData(data2, data2 + ne2[3]*ne2[2]*ne2[1]*ne2[0]);
   std::vector<int64_t> selfShape = {ne1[3], ne1[2], ne1[1], ne1[0]};
