@@ -1,1 +1,0 @@
-/usr/bin/g++ -O3 -DNDEBUG "CMakeFiles/test-grammar-parser.dir/test-grammar-parser.cpp.o" "CMakeFiles/test-grammar-parser.dir/get-model.cpp.o" -o ../bin/test-grammar-parser  ../common/libcommon.a ../libllama.a /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.so -pthread 

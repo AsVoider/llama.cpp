@@ -1,1 +1,0 @@
-/usr/bin/g++ -O3 -DNDEBUG "CMakeFiles/llama-baby-llama.dir/baby-llama.cpp.o" -o ../../bin/llama-baby-llama  ../../common/libcommon.a ../../libllama.a -pthread /usr/lib/gcc/x86_64-linux-gnu/9/libgomp.so /usr/lib/x86_64-linux-gnu/libpthread.so -pthread 
