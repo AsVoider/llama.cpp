@@ -11,6 +11,8 @@ extern "C" {
 
 #define GGML_ASCEND_MAX_DEVICES       16
 
+GGML_API GGML_CALL bool ggml_backend_ascend_device_init();
+
 GGML_API GGML_CALL ggml_backend_t ggml_backend_ascend_init(int device);
 
 GGML_API GGML_CALL bool ggml_backend_is_ascend(ggml_backend_t backend);

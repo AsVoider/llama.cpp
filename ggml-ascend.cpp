@@ -213,11 +213,6 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
     }
 };
 
-// std::unique_ptr<ggml_ascend_pool> ggml_backend_ascend_context::new_pool_for_device(int device) {
-//     // todo if vmm?: fixed
-//     return std::unique_ptr<ggml_ascend_pool>(new ggml_ascend_pool_leg(device));
-// }
-
 // ascend buffer copy
 
 struct ggml_backend_ascend_buffer_context {
@@ -994,6 +989,11 @@ GGML_CALL ggml_backend_t ggml_backend_ascend_init(int device) {
     };
 
     return ascend_backend;
+}
+
+GGML_CALL bool ggml_backend_ascend_device_init() {
+    auto ret = aclInit(nullptr);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl Init failed at [ggml_backend_ascend_device_init]: %d\n", ret); return false);
 }
 
 GGML_CALL bool ggml_backend_is_ascend(ggml_backend_t backend) {

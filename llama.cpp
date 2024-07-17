@@ -5486,6 +5486,14 @@ static bool llm_load_tensors(
     }
 #endif
 
+#ifdef GGML_USE_ASCEND
+    auto init_res = ggml_backend_ascend_device_init();
+    if (!init_ret) {
+        printf("Error While Init Ascend\n");
+        exit(1);
+    }
+#endif
+
     model.split_mode   = split_mode;
     model.main_gpu     = main_gpu;
     model.n_gpu_layers = n_gpu_layers;
