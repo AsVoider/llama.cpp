@@ -37,7 +37,7 @@ add_executable(test
         aclnn-comp.cpp
         aclnn-math.cpp
         aclnn-rope.cpp
-        aclnn-permute
+        aclnn-permute.cpp
         common.cpp)
 
 # 设置ASCEND_PATH（CANN软件包目录，请根据实际路径修改）和INCLUDE_BASE_DIR（头文件目录）
