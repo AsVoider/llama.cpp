@@ -35,6 +35,10 @@ int aclnn_mul_mat_func(void* selfDataAddr, void* mat2DataAddr, void* outDataAddr
 int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2HostData, std::vector<int64_t>& selfShape, std::vector<int64_t>& mat2Shape,std::vector<int64_t>& outShape, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream);
 void aclnnMulMatTest();
 
+int aclnn_batch_mat_mul_func(void* selfDataAddr, void* mat2DataAddr, void* outDataAddr,
+  aclnn_shape_t selfShape, aclnn_shape_t mat2Shape, aclnn_shape_t outShape,
+  aclDataType selfDataType, aclDataType mat2DataType, aclDataType outDataType,
+  aclrtStream &stream);
 
 
 

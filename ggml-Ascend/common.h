@@ -36,6 +36,7 @@ void ggml_ascend_error(const char * stmt, const char * func, const char * file, 
 #define aclnn_float_data_t std::vector<float>
 
 extern aclDataType ggml_to_acl_map[GGML_TYPE_COUNT];
+extern size_t ggml_type_size_t[GGML_TYPE_COUNT];
 
 int64_t GetShapeSize(const std::vector<int64_t>& shape);
 int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream);
@@ -94,6 +95,8 @@ int data_addr_malloc(const aclnn_shape_t& shape, const std::vector<T>& hostData,
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMemcpy failed. ERROR: %d\n", ret); return ret);
     return 0;
 }
+
+int addr_malloc(const aclnn_shape_t& shape, void** deviceAddr, size_t size_t);
 
 template<typename T>
 struct ggml_ascend_pool_alloc {

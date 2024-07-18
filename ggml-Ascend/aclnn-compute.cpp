@@ -6,10 +6,10 @@
 #include "aclnn-cpy.h"
 #include "aclnn-unary.h"
 #include "aclnn-comp.h"
-#include "../../../../../Ascend/ascend-toolkit/8.0.RC2.alpha003/toolkit/toolchain/hcc/sysroot/usr/include/string.h"
 #include "aclnn-norm.h"
 #include "aclnn-math.h"
 #include "aclnn-rope.h"
+#include "aclnn-permute.h"
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -252,25 +252,83 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
-    aclnn_shape_t selfShape = {ne03, ne02, ne01, ne00};
-    aclnn_shape_t otherShape = {ne13, ne12, ne11, ne10};
-    aclnn_shape_t outShape = {ne3, ne2, ne1, ne0};
+    CHECK_RET((ne03 == ne13 && ne13 == 1), LOG_PRINT("error: ne03: %ld, ne13: %ld\n", ne03, ne13));
+    CHECK_RET((ne12 >= ne02 && ne12 % ne02 == 0), LOG_PRINT("error: ne12: %ld, ne02: %ld\n", ne12, ne02));
 
-    std::cout<<"in ggml_ascend_mat_mul :"<<std::endl;
-    std::cout<<"src0 shape: "<<src0->ne[3]<<" "<<src0->ne[2]<<" "<<src0->ne[1]<<" "<<src0->ne[0]<<std::endl;
-    std::cout<<"src1 shape: "<<src1->ne[3]<<" "<<src1->ne[2]<<" "<<src1->ne[1]<<" "<<src1->ne[0]<<std::endl;
-    std::cout<<"dst shape: "<<dst->ne[3]<<" "<<dst->ne[2]<<" "<<dst->ne[1]<<" "<<dst->ne[0]<<std::endl;
-    std::cout<<"src name: "<<src0->name<<" "<<src1->name<<std::endl;
-    std::cout<<"dst name: "<<dst->name<<std::endl;
-    std::cout<<"src0 type: "<< src0->type << std::endl;
-    std::cout<<"src1 type: "<< src1->type << std::endl;
-    std::cout<<"dst type: "<< dst->type << std::endl;
-
-    int ret = aclnn_mul_mat_func(src0->data, src1->data, dst->data,
-                                selfShape, otherShape, outShape,
-                                ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type],
-                                stream);
+    void* permuteSelfDeviceAddr = src0->data;
+    void* permuteOutDeviceAddr = nullptr;
+    aclnn_shape_t permuteSelfShape = {ne03, ne02, ne01, ne00};
+    aclnn_shape_t permuteOutShape = {ne03, ne02, ne00, ne01};
+    aclnn_shape_t permuteDims = {0, 1, 3, 2};
+    int ret = addr_malloc(permuteOutShape, &permuteOutDeviceAddr, ggml_type_size_t[src0->type]);
     CHECK_RET(ret == ACL_SUCCESS, return);
+
+    ret = aclnn_permute_func(permuteSelfDeviceAddr, permuteOutDeviceAddr,
+                                permuteSelfShape, permuteOutShape,
+                                ggml_to_acl_map[src0->type], ggml_to_acl_map[src0->type],
+                                permuteDims, stream);
+
+    // LOG_PRINT("\naclnn_permute_func: \n");
+    // auto tmp_size = GetShapeSize(permuteOutShape);
+    // std::vector<aclFloat16> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), permuteOutDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, aclFloat16ToFloat(resultData[i]));
+    // }
+
+    void* cpySelfRefDeviceAddr = nullptr;
+    void* cpySrcDeviceAddr = permuteOutDeviceAddr;
+    aclnn_shape_t cpySelfRefShape = {ne03, ne02, ne00, ne01};
+    aclnn_shape_t cpySrcShape = permuteOutShape;
+    ret = addr_malloc(cpySelfRefShape, &cpySelfRefDeviceAddr, ggml_type_size_t[src1->type]);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    ret = aclnn_cpy_func(cpySelfRefDeviceAddr, cpySrcDeviceAddr,
+                        cpySelfRefShape, cpySrcShape,
+                        ggml_to_acl_map[src1->type], ggml_to_acl_map[src0->type],
+                        stream);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    // LOG_PRINT("\aclnn_cpy_func: \n");
+    // auto tmp_size = GetShapeSize(cpySelfRefShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), cpySelfRefDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
+    void* batchMatMulSelfDeviceAddr = src1->data;
+    void* batchMatMulMat2DeviceAddr = cpySelfRefDeviceAddr;
+    void* batchMatMulOutDeviceAddr = dst->data;
+    aclnn_shape_t batchMatMulSelfShape = {ne12, ne11, ne10};
+    aclnn_shape_t batchMatMulMat2Shape = {ne02, ne00, ne01};
+    aclnn_shape_t batchMatMulOutShape = {ne2, ne1, ne0};
+
+    // LOG_PRINT("ne12: %ld, ne11: %ld, ne10: %ld\n", ne12, ne11, ne10);
+    // LOG_PRINT("ne02: %ld, ne00: %ld, ne01: %ld\n", ne02, ne00, ne01);
+    // LOG_PRINT("ne2: %ld, ne1: %ld, ne0: %ld\n", ne2, ne1, ne0);
+
+    // LOG_PRINT("\abatchMatMulSelfDeviceAddr: \n");
+    // auto tmp_size = GetShapeSize(batchMatMulSelfShape);
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), batchMatMulSelfDeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
+    ret = aclnn_batch_mat_mul_func(batchMatMulSelfDeviceAddr, batchMatMulMat2DeviceAddr, batchMatMulOutDeviceAddr,
+                                batchMatMulSelfShape, batchMatMulMat2Shape, batchMatMulOutShape,
+                                ggml_to_acl_map[src1->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type],
+                                stream);
+
+    aclrtFree(permuteOutDeviceAddr);
+    aclrtFree(cpySelfRefDeviceAddr);
 }
 
 void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
