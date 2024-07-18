@@ -24,8 +24,15 @@ int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
     uint64_t workspaceSize = 0;
     aclOpExecutor* executor;
 
+    // std::cout<< "in aclnn_cpy_func :"<<std::endl;
+    // std::cout<<"selfRefDataType :"<<selfRefDataType<<std::endl;
+    // std::cout<<"srcDataTypeType :"<<srcDataType<<std::endl;
+
+
     ret = aclnnInplaceCopyGetWorkspaceSize(selfRef, src, &workspaceSize, &executor);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInplaceCopyGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInplaceCopyGetWorkspaceSize failed. ERROR: %d\n", ret);  return ret);
+
+    // std::cout<<aclGetRecentErrMsg()<<std::endl;
 
     void* workspaceAddr = nullptr;
     if (workspaceSize > 0) {

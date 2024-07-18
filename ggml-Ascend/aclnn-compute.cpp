@@ -106,6 +106,14 @@ void ggml_ascend_cpy(ggml_backend_ascend_context &ctx, ggml_tensor *src, ggml_te
 
     aclnn_shape_t srcShape = {src->ne[3], src->ne[2], src->ne[1], src->ne[0]};
     aclnn_shape_t dstShape = {dst->ne[3], dst->ne[2], dst->ne[1], dst->ne[0]};
+    srcShape = dstShape;
+
+    // std::cout<<"in ggml_ascend_cpy :"<<std::endl;
+    // std::cout<<"src shape: "<<src->ne[3]<<" "<<src->ne[2]<<" "<<src->ne[1]<<" "<<src->ne[0]<<std::endl;
+    // std::cout<<"dst shape: "<<dst->ne[3]<<" "<<dst->ne[2]<<" "<<dst->ne[1]<<" "<<dst->ne[0]<<std::endl;
+    // std::cout<<"src name: "<<src->name<<std::endl;
+    // std::cout<<"dst name: "<<dst->name<<std::endl;
+
 
     int ret = aclnn_cpy_func(dst->data, src->data,
                             dstShape, srcShape,
@@ -247,6 +255,16 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
     aclnn_shape_t selfShape = {ne03, ne02, ne01, ne00};
     aclnn_shape_t otherShape = {ne13, ne12, ne11, ne10};
     aclnn_shape_t outShape = {ne3, ne2, ne1, ne0};
+
+    std::cout<<"in ggml_ascend_mat_mul :"<<std::endl;
+    std::cout<<"src0 shape: "<<src0->ne[3]<<" "<<src0->ne[2]<<" "<<src0->ne[1]<<" "<<src0->ne[0]<<std::endl;
+    std::cout<<"src1 shape: "<<src1->ne[3]<<" "<<src1->ne[2]<<" "<<src1->ne[1]<<" "<<src1->ne[0]<<std::endl;
+    std::cout<<"dst shape: "<<dst->ne[3]<<" "<<dst->ne[2]<<" "<<dst->ne[1]<<" "<<dst->ne[0]<<std::endl;
+    std::cout<<"src name: "<<src0->name<<" "<<src1->name<<std::endl;
+    std::cout<<"dst name: "<<dst->name<<std::endl;
+    std::cout<<"src0 type: "<< src0->type << std::endl;
+    std::cout<<"src1 type: "<< src1->type << std::endl;
+    std::cout<<"dst type: "<< dst->type << std::endl;
 
     int ret = aclnn_mul_mat_func(src0->data, src1->data, dst->data,
                                 selfShape, otherShape, outShape,
