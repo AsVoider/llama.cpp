@@ -356,6 +356,10 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
     int64_t size = ne[0] * ne[1] * ne[2] * ne[3];
 
+
+    // std::cout<<"in Rope"<<std::endl;
+    // std::cout<<ne[0]<<" "<<ne[1]<<" "<<ne[2]<<" "<<ne[3]<<std::endl;
+
     // float theta_scale_pow[ne[0] / 2];
     // float theta_base[size];
     // float theta[size];
@@ -538,7 +542,20 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
     // }
 
-    void* queryDeviceAddr = src0->data;
+    void* permuteSelfDeviceAddr = src0->data;
+    void* permuteOutDeviceAddr = nullptr;
+    aclnn_shape_t permuteSelfShape = {1, size/ne[0], ne[0]/2, 2};
+    aclnn_shape_t permuteOutShape = {1, size/ne[0], 2, ne[0]/2};
+    aclnn_shape_t permuteDims = {0, 1, 3, 2};
+    ret = addr_malloc(permuteOutShape, &permuteOutDeviceAddr, ggml_type_size_t[src0->type]);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+
+    ret = aclnn_permute_func(permuteSelfDeviceAddr, permuteOutDeviceAddr,
+                                permuteSelfShape, permuteOutShape,
+                                ggml_to_acl_map[src0->type], ggml_to_acl_map[src0->type],
+                                permuteDims, stream);
+
+    void* queryDeviceAddr = permuteOutDeviceAddr;
     void* keyDeviceAddr = dst->data;
     void* sinDeviceAddr = sinOutDeviceAddr;
     void* cosDeviceAddr = cosOutDeviceAddr;
