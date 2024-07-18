@@ -19,7 +19,7 @@ file(GLOB SRC_LIST ${BASE_LLAMA_DIR}/*.cpp ${BASE_LLAMA_DIR}/*.h ${BASE_LLAMA_DI
 
 # 设置可执行文件名（如test_1），并指定待运行算子文件*.cpp所在目录
 add_executable(test
-        test.cpp
+        main.cpp
         aclnn-test.cpp
         aclnn-compute.cpp
         aclnn-compute-test.cpp

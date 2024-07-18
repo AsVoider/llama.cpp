@@ -7,6 +7,7 @@
 #include "aclnn-norm.h"
 #include "aclnn-add.h"
 #include "aclnn-math.h"
+#include "aclnn-compute.h"
 
 int main() {
 
@@ -17,45 +18,41 @@ int main() {
   // freq_base = dst->op_params[5];
   // n_dims = dst->op_params[1];
   // pos = dst->src[1]->data
-  
-  auto start = std::chrono::high_resolution_clock::now();
+
 
   int32_t deviceId = 0;
   aclrtContext context;
   aclrtStream stream;
   auto ret = Init(deviceId, &context, &stream);
-  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
-
-  float dst[256];
-  int64_t ne[4]= {128,1,2,1};
-  int freq_scale = 2;
-  float freq_base = 1000;
-  int n_dims = 128;
-  int32_t pos[2] = {1, 2};
-  float x[256];
-  for (int i = 0; i<256; i++){
-    x[i]= 10000.0;
-  }
-
-  aclnnRopeCompute(ne, freq_scale, freq_base, n_dims, pos, x, dst, context, stream);
 
 
+  ret = aclrtCreateStream(&stream);
 
-  auto end = std::chrono::high_resolution_clock::now();
-  auto duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
-  std::cout << "running time: " << duration.count() << " ms" << std::endl;
+  // 1. 申请内存
+uint64_t size = 1 * 1024 * 1024;
+void* hostAddr = NULL;
+void* devAddr = NULL;
+aclrtMallocHost(&hostAddr, size + 64);
+aclrtMalloc(&devAddr, size, ACL_MEM_MALLOC_NORMAL_ONLY);
 
-  std::cout << "Elements of array b:" << std::endl;
-  for (int i = 0; i < 36; ++i) {
-    std::cout << dst[i] << " ";
-  }
-  std::cout << std::endl;
-
-
-  aclrtDestroyStream(stream);
-  aclrtDestroyContext(context);
-  aclrtResetDevice(deviceId);
-  aclFinalize();
+// 2. 异步内存复制
+// aclrtStream stream = NULL;
+// 申请内存后，可向内存中读入数据，该自定义函数ReadFile由用户实现
+ret = aclrtMemcpy(devAddr, size, hostAddr, size, ACL_MEMCPY_HOST_TO_DEVICE);
+if (ret != ACL_SUCCESS) {
+  std::cout<< aclGetRecentErrMsg()<< std::endl;
+  exit(0);
+}
+  
+ret = aclrtSynchronizeStream(stream);
+if (ret != ACL_SUCCESS) {
+  std::cout<< "fuck\n" << aclGetRecentErrMsg()<< std::endl;
+}
+  
+// 3. 释放资源
+aclrtDestroyStream(stream);
+aclrtFreeHost(hostAddr);
+aclrtFree(devAddr);
 
   return 0;
 }
