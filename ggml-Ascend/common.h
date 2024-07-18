@@ -180,17 +180,18 @@ struct ggml_backend_ascend_context {
     }
 
     void ggml_ascend_set_device(int device) {
-        int current_device;
-        // todo Check: fixed
-        auto ret = aclrtGetDevice(&current_device);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_set_device]: %d\n", ret); return);
+        // int current_device;
+        // // todo Check: fixed
+        // auto ret = aclrtGetDevice(&current_device);
+        // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_set_device]: %d\n", ret); return);
 
-        if (device == current_device) {
-            return;
-        }
+        // if (device == current_device) {
+        //     return;
+        // }
 
         // todo Check: fixed
-        ret = aclrtSetDevice(device);
+        auto ret = aclrtSetDevice(device);
+        this->device = device;
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl set device failed at [ggml_ascend_set_device]: %d\n", ret); return);
     }
 
@@ -198,7 +199,9 @@ struct ggml_backend_ascend_context {
         if (streams[device][stream] == nullptr) {
             ggml_ascend_set_device(device);
             // GGML_UNUSED(); todo check
-            aclrtCreateStreamWithConfig(&streams[device][stream], 0, ACL_STREAM_FAST_SYNC);
+            auto ret = aclrtCreateStreamWithConfig(&streams[device][stream], 0, ACL_STREAM_FAST_SYNC);
+            CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("create stream failed : %d\n", ret));
+            printf("device is %d, stream is %d\n", device, stream);
         }
         return streams[device][stream];
     }

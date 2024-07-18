@@ -93,17 +93,18 @@ void ggml_ascend_error(const char * stmt, const char * func, const char * file, 
 }
 
 void ggml_ascend_set_device(int device) {
-    int current_device;
-    // todo Check: fixed
-    auto ret = aclrtGetDevice(&current_device);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_set_device]: %d\n", ret); return);
+    // int current_device;
+    // // todo Check: fixed
+    // auto ret = aclrtGetDevice(&current_device);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl get device failed at [ggml_ascend_set_device]: %d\n", ret));
 
-    if (device == current_device) {
-        return;
-    }
+    // printf("device is %d, current is %d\n", device, current_device);
+    // if (device == current_device || ret != ACL_SUCCESS) {
+    //     return;
+    // }
 
     // todo Check: fixed
-    ret = aclrtSetDevice(device);
+    auto ret = aclrtSetDevice(device);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl set device failed at [ggml_ascend_set_device]: %d\n", ret); return);
 }
 
@@ -212,11 +213,6 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
         pool_size -= size;
     }
 };
-
-// std::unique_ptr<ggml_ascend_pool> ggml_backend_ascend_context::new_pool_for_device(int device) {
-//     // todo if vmm?: fixed
-//     return std::unique_ptr<ggml_ascend_pool>(new ggml_ascend_pool_leg(device));
-// }
 
 // ascend buffer copy
 
@@ -612,8 +608,9 @@ GGML_CALL static void ggml_backend_ascend_set_tensor_async(ggml_backend_t backen
     auto buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
     GGML_ASSERT(buf->buft == ggml_backend_ascend_buffer_type(ctx->device) && "unsupport buffer type");
-    // todo Check
-    auto ret = aclrtMemcpyAsync((char *)tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE, ctx->stream());
+    // todo Check: fixed
+    printf("tensor->data is %p, offset is %ld, size is %lx, data is %p\n", tensor->data, offset, size, data);
+    auto ret = aclrtMemcpy((char *)tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpyAsync failed at [ggml_backend_ascend_set_tensor_async]: %d\n", ret); return);
 }
 
@@ -622,8 +619,8 @@ GGML_CALL static void ggml_backend_ascend_get_tensor_async(ggml_backend_t backen
     auto buf = tensor->view_src ? tensor->view_src->buffer : tensor->buffer;
 
     GGML_ASSERT(buf->buft == ggml_backend_ascend_buffer_type(ctx->device) && "unsupported buffer type");
-    // todo Check
-    auto ret = aclrtMemcpyAsync(data, size, (const char *)tensor->data + offset, size, ACL_MEMCPY_DEVICE_TO_HOST, ctx->stream());
+    // todo Check: fixed
+    auto ret = aclrtMemcpy(data, size, (const char *)tensor->data + offset, size, ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpyAsync failed at [ggml_backend_ascend_get_tensor_async]: %d\n", ret); return);
 }
 
@@ -655,7 +652,7 @@ GGML_CALL static bool ggml_backend_ascend_cpy_tensor_async(ggml_backend_t backen
 
         // copy on src stream
         if (ctx_src->device == ctx_dst->device) {
-            auto ret = aclrtMemcpyAsync(dst->data, ggml_nbytes(dst), src->data, ggml_nbytes(dst), ACL_MEMCPY_DEVICE_TO_DEVICE, ctx_dst->stream());
+            auto ret = aclrtMemcpy(dst->data, ggml_nbytes(dst), src->data, ggml_nbytes(dst), ACL_MEMCPY_DEVICE_TO_DEVICE);
             CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpyAsync1 failed at [ggml_backend_ascend_cpy_tensor_async]: %d\n", ret); return false);
         } else {
             // todo Not Support Peer Copy: marked
@@ -681,7 +678,7 @@ GGML_CALL static bool ggml_backend_ascend_cpy_tensor_async(ggml_backend_t backen
     } else {
         // src and dst are on the same backend
         // todo check: fixed
-        auto ret = aclrtMemcpyAsync(dst->data, ggml_nbytes(dst), src->data, ggml_nbytes(dst), ACL_MEMCPY_DEVICE_TO_DEVICE, ctx_dst->stream());
+        auto ret = aclrtMemcpy(dst->data, ggml_nbytes(dst), src->data, ggml_nbytes(dst), ACL_MEMCPY_DEVICE_TO_DEVICE);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpyAsync2 failed at [ggml_backend_ascend_cpy_tensor_async]: %d\n", ret); return false);
     }
     return true;
@@ -693,7 +690,9 @@ GGML_CALL static void ggml_backend_ascend_synchronize(ggml_backend_t backend) {
     //todo Check: fixed
     auto ret = aclrtSynchronizeStream(ctx->stream());
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl SynchronizeStream failed at [ggml_backend_ascend_synchronize]: %d\n", ret));
-
+    if (ret != ACL_SUCCESS) {
+        printf("%s\n", aclGetRecentErrMsg());
+    }
     GGML_UNUSED(backend);
 }
 
@@ -994,6 +993,16 @@ GGML_CALL ggml_backend_t ggml_backend_ascend_init(int device) {
     };
 
     return ascend_backend;
+}
+
+GGML_CALL bool ggml_backend_ascend_device_init() {
+    auto ret = aclInit(nullptr);
+    if (ret == ACL_SUCCESS) {
+        return true;
+    } else {
+        return false;
+    }
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl Init failed at [ggml_backend_ascend_device_init]: %d\n", ret); return false);
 }
 
 GGML_CALL bool ggml_backend_is_ascend(ggml_backend_t backend) {

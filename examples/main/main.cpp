@@ -208,12 +208,16 @@ int main(int argc, char ** argv) {
     if (sparams.cfg_scale > 1.f) {
         struct llama_context_params lparams = llama_context_params_from_gpt_params(params);
         ctx_guidance = llama_new_context_with_model(model, lparams); // todo
+        printf("check 100\n");
     }
 
     if (model == NULL) {
         LOG_TEE("%s: error: unable to load model\n", __func__);
         return 1;
     }
+
+    printf("Load Success\n");
+    exit(0);
 
     const int n_ctx_train = llama_n_ctx_train(model);
     const int n_ctx = llama_n_ctx(ctx);
