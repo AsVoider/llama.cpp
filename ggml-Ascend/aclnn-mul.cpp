@@ -7,6 +7,7 @@
 #include "aclnnop/aclnn_add.h"
 #include "aclnnop/aclnn_mul.h"
 #include "aclnnop/aclnn_matmul.h"
+#include "aclnnop/aclnn_batch_matmul.h"
 #include "common.h"
 #include "aclnn-mul.h"
 
@@ -349,6 +350,50 @@ int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2Ho
   if (workspaceSize > 0) {
     aclrtFree(workspaceAddr);
   }
+  return 0;
+}
+
+int aclnn_batch_mat_mul_func(void* selfDataAddr, void* mat2DataAddr, void* outDataAddr,
+  aclnn_shape_t selfShape, aclnn_shape_t mat2Shape, aclnn_shape_t outShape,
+  aclDataType selfDataType, aclDataType mat2DataType, aclDataType outDataType,
+  aclrtStream &stream) {
+  
+  auto ret = 0;
+  int8_t cubeMathType = 1;
+
+  aclTensor* self = nullptr;
+  aclTensor* mat2 = nullptr;
+  aclTensor* out = nullptr;
+
+  ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(mat2Shape, mat2DataType, &mat2DataAddr, &mat2);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor;
+
+  ret = aclnnBatchMatMulGetWorkspaceSize(self, mat2, out, cubeMathType, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBatchMatMulGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+    ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+  ret = aclnnBatchMatMul(workspaceAddr, workspaceSize, executor, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnBatchMatMul failed. ERROR: %d\n", ret); return ret);
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  aclDestroyTensor(self);
+  aclDestroyTensor(mat2);
+  aclDestroyTensor(out);
+  if (workspaceSize > 0) {
+    aclrtFree(workspaceAddr);
+  }
+
   return 0;
 }
 
