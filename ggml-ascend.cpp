@@ -609,7 +609,6 @@ GGML_CALL static void ggml_backend_ascend_set_tensor_async(ggml_backend_t backen
 
     GGML_ASSERT(buf->buft == ggml_backend_ascend_buffer_type(ctx->device) && "unsupport buffer type");
     // todo Check: fixed
-    printf("tensor->data is %p, offset is %ld, size is %lx, data is %p\n", tensor->data, offset, size, data);
     auto ret = aclrtMemcpy((char *)tensor->data + offset, size, data, size, ACL_MEMCPY_HOST_TO_DEVICE);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl memcpyAsync failed at [ggml_backend_ascend_set_tensor_async]: %d\n", ret); return);
 }

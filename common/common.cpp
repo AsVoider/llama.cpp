@@ -2011,7 +2011,6 @@ std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_par
         llama_free_model(model);
         return std::make_tuple(nullptr, nullptr);
     }
-    printf("control vector before\n");
     if (!params.control_vectors.empty()) {
         if (params.control_vector_layer_start <= 0) params.control_vector_layer_start = 1;
         if (params.control_vector_layer_end   <= 0) params.control_vector_layer_end   = llama_n_layer(model);
@@ -2035,7 +2034,6 @@ std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_par
             return std::make_tuple(nullptr, nullptr);
         }
     }
-    printf("control vec\n");
     for (unsigned int i = 0; i < params.lora_adapter.size(); ++i) {
         const std::string & lora_adapter = std::get<0>(params.lora_adapter[i]);
         float lora_scale = std::get<1>(params.lora_adapter[i]);
@@ -2067,7 +2065,6 @@ std::tuple<struct llama_model *, struct llama_context *> llama_init_from_gpt_par
         llama_synchronize(lctx);
         llama_reset_timings(lctx);
     }
-    printf("return from init\n");
     return std::make_tuple(model, lctx);
 }
 

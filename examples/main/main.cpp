@@ -216,8 +216,8 @@ int main(int argc, char ** argv) {
         return 1;
     }
 
-    printf("Load Success\n");
-    exit(0);
+    // printf("Load Success\n");
+    // exit(0);
 
     const int n_ctx_train = llama_n_ctx_train(model);
     const int n_ctx = llama_n_ctx(ctx);

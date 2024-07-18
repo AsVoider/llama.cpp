@@ -349,7 +349,6 @@ void ggml_backend_tensor_copy_async(ggml_backend_t backend_src, ggml_backend_t b
     // an async copy would normally happen after all the queued operations on both backends are completed
     // sync src, set_async dst
     if (ggml_backend_buffer_is_host(src->buffer)) {
-        printf("reach here\n");
         ggml_backend_synchronize(backend_src);
         ggml_backend_tensor_set_async(backend_dst, dst, src->data, 0, ggml_nbytes(src));
     } else {
@@ -1742,25 +1741,25 @@ static bool ggml_backend_sched_alloc_splits(ggml_backend_sched_t sched) {
 
 static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t sched) {
     struct ggml_backend_sched_split * splits = sched->splits;
-    printf("n_splits: %d\n", sched->n_splits);
+    // printf("n_splits: %d\n", sched->n_splits);
     for (int i = 0; i < sched->n_splits; i++) {
         struct ggml_backend_sched_split * split = &splits[i];
         int split_backend_id = split->backend_id;
         ggml_backend_t split_backend = sched->backends[split_backend_id];
-        printf("backend id:%d, backend: %p\n", split_backend_id, (void*)split_backend);
-        printf("split->n_inputs %d\n", split->n_inputs);
+        // printf("backend id:%d, backend: %p\n", split_backend_id, (void*)split_backend);
+        // printf("split->n_inputs %d\n", split->n_inputs);
         // copy the input tensors to the split backend
         for (int j = 0; j < split->n_inputs; j++) {
             ggml_backend_t input_backend = ggml_backend_sched_get_tensor_backend(sched, split->inputs[j]);
             struct ggml_tensor * input = split->inputs[j];
             struct ggml_tensor * input_cpy = sched->tensor_copies[hash_id(input)][split_backend_id][sched->cur_copy];
-            printf("sync\n");
+            // printf("sync\n");
             if (input->flags & GGML_TENSOR_FLAG_INPUT) {
                 // inputs from the user must be copied immediately to prevent the user overwriting the data before the copy is done
                 if (sched->events[split_backend_id][sched->cur_copy] != NULL) {
                     ggml_backend_event_synchronize(sched->events[split_backend_id][sched->cur_copy]);
                 } else {
-                    printf("sync1\n");
+                    // printf("sync1\n");
                     ggml_backend_synchronize(split_backend);
                 }
                 ggml_backend_tensor_copy(input, input_cpy);
@@ -1769,10 +1768,9 @@ static enum ggml_status ggml_backend_sched_compute_splits(ggml_backend_sched_t s
                 if (sched->events[split_backend_id][sched->cur_copy] != NULL) {
                     ggml_backend_event_wait(split_backend, sched->events[split_backend_id][sched->cur_copy]);
                 } else {
-                    printf("sync2\n");
+                    // printf("sync2\n");
                     ggml_backend_synchronize(split_backend);
                 }
-                printf("input bak is %p, split bak is %p\n", (void *)input_backend, (void *)split_backend);
                 ggml_backend_tensor_copy_async(input_backend, split_backend, input, input_cpy);
             }
         }

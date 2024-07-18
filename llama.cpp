@@ -4075,7 +4075,7 @@ struct llama_model_loader {
                     mmap_used.second = std::max(mmap_used.second, weight->offs + n_size);
                 } else {
                     ggml_backend_tensor_set(cur, data, 0, n_size); // todo
-                    printf("check p3\n");
+                    // printf("check p3\n");
                 }
             } else {
                 GGML_ASSERT(weight->idx < files.size());
@@ -6967,7 +6967,7 @@ static bool llm_load_tensors(
         }
 #endif
         else {
-            printf("check p1\n");
+            // printf("check p1\n");
             ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
             if (buf == nullptr) {
                 throw std::runtime_error("unable to allocate backend buffer");
@@ -7022,7 +7022,7 @@ static bool llm_load_tensors(
             model.tensors_by_name.emplace_back(ggml_get_name(cur), cur);
         }
     }
-    printf("check p2\n");
+    // printf("check p2\n");
     // load tensor data
     for (auto & it : ctx_bufs) {
         ggml_context * ctx = it.first;
@@ -12740,7 +12740,7 @@ static void llama_graph_compute(
         ggml_backend_metal_set_n_cb(lctx.backend_metal, n_threads);
     }
 #endif
-    printf("start graph compute\n");
+    // printf("start graph compute\n");
     if (lctx.backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(lctx.backend_cpu, n_threads);
         ggml_backend_cpu_set_abort_callback(lctx.backend_cpu, lctx.abort_callback, lctx.abort_callback_data);
@@ -12752,7 +12752,7 @@ static void llama_graph_compute(
 #endif
     
     ggml_backend_sched_graph_compute_async(lctx.sched, gf);
-    printf("return from graph compute");
+    // printf("return from graph compute");
     // fprintf(stderr, "splits: %d\n", ggml_backend_sched_get_n_splits(lctx.sched));
 }
 
@@ -17531,7 +17531,7 @@ struct llama_context * llama_new_context_with_model(
                 llama_free(ctx);
                 return nullptr;
             }
-            printf("reserve\n");
+            // printf("reserve\n");
 
             for (size_t i = 0; i < ctx->backends.size(); i++) {
                 ggml_backend_t backend = ctx->backends[i];
@@ -17543,16 +17543,15 @@ struct llama_context * llama_new_context_with_model(
                             size / 1024.0 / 1024.0);
                 }
             }
-            printf("buffer size\n");
+            // printf("buffer size\n");
 
             // note: the number of splits during measure is higher than during inference due to the kv shift
             int n_splits = ggml_backend_sched_get_n_splits(ctx->sched);
-            printf("nsplits\n");
             LLAMA_LOG_INFO("%s: graph nodes  = %d\n", __func__, gf->n_nodes);
             LLAMA_LOG_INFO("%s: graph splits = %d\n", __func__, n_splits);
         }
     }
-    printf("return\n");
+    // printf("return\n");
     return ctx;
 }
 
@@ -19086,12 +19085,10 @@ void llama_batch_free(struct llama_batch batch) {
 int32_t llama_decode(
         struct llama_context * ctx,
           struct llama_batch   batch) {
-    printf("start decode\n");
     const int ret = llama_decode_internal(*ctx, batch);
     if (ret < 0) {
         LLAMA_LOG_ERROR("%s: failed to decode, ret = %d\n", __func__, ret);
     }
-    printf("return from decode\n");
     return ret;
 }
 
