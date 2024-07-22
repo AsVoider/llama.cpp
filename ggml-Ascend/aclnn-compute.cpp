@@ -302,6 +302,25 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
                         stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
 
+    void* boardcastSrc0DeviceAddr = nullptr;
+    int64_t size = ne03 * ne12 * ne01 * ne00;
+    ret = aclrtMalloc(&boardcastSrc0DeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+    for (int i = 0; i < size; i += ne02 * ne01 * ne00) {
+        ret = aclrtMemcpy((void *)((float *)boardcastSrc0DeviceAddr + i), ne02 * ne01 * ne00 * sizeof(float), cpySelfRefDeviceAddr, ne02 * ne01 * ne00 * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
+        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    }
+
+    // LOG_PRINT("\boardcastSrc0DeviceAddr: \n");
+    // auto tmp_size = size;
+    // std::vector<float> resultData(tmp_size, 0);
+    // ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), boardcastSrc0DeviceAddr,
+    //                     tmp_size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return;);
+    // for (int64_t i = 0; i < tmp_size; i++) {
+    //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    // }
+
     // LOG_PRINT("\aclnn_cpy_func: \n");
     // auto tmp_size = GetShapeSize(cpySelfRefShape);
     // std::vector<float> resultData(tmp_size, 0);
@@ -313,10 +332,10 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
     // }
 
     void* batchMatMulSelfDeviceAddr = src1->data;
-    void* batchMatMulMat2DeviceAddr = cpySelfRefDeviceAddr;
+    void* batchMatMulMat2DeviceAddr = boardcastSrc0DeviceAddr;
     void* batchMatMulOutDeviceAddr = dst->data;
     aclnn_shape_t batchMatMulSelfShape = {ne12, ne11, ne10};
-    aclnn_shape_t batchMatMulMat2Shape = {ne02, ne00, ne01};
+    aclnn_shape_t batchMatMulMat2Shape = {ne12, ne00, ne01};
     aclnn_shape_t batchMatMulOutShape = {ne2, ne1, ne0};
 
     // LOG_PRINT("ne12: %ld, ne11: %ld, ne10: %ld\n", ne12, ne11, ne10);
@@ -340,6 +359,7 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
 
     aclrtFree(permuteOutDeviceAddr);
     aclrtFree(cpySelfRefDeviceAddr);
+    aclrtFree(boardcastSrc0DeviceAddr);
 }
 
 void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
@@ -570,9 +590,20 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
                         stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
-    ret = aclrtMemcpy(keyDeviceAddr, size * sizeof(float), queryDeviceAddr, size * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    // ret = aclrtMemcpy(keyDeviceAddr, size * sizeof(float), queryDeviceAddr, size * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
     // ret = aclnnRoPEFunc(queryShape, keyShape, cosShapeRp, sinShapeRp, queryHostData, keyHostData, cosQKHostData, sinQKHostData, dst, context, stream); 
+
+    void* permuteSelfDeviceAddr1 = queryDeviceAddr;
+    void* permuteOutDeviceAddr1 = keyDeviceAddr;
+    aclnn_shape_t permuteSelfShape1 = {1, size/ne[0], 2, ne[0]/2};
+    aclnn_shape_t permuteOutShape1 = {1, size/ne[0], ne[0]/2, 2};
+    aclnn_shape_t permuteDims1 = {0, 1, 3, 2};
+
+    ret = aclnn_permute_func(permuteSelfDeviceAddr1, permuteOutDeviceAddr1,
+                                permuteSelfShape1, permuteOutShape1,
+                                ggml_to_acl_map[src0->type], ggml_to_acl_map[src0->type],
+                                permuteDims1, stream);
 
     aclrtFree(powExpDeviceAddr);
     aclrtFree(powOutDeviceAddr);
@@ -582,4 +613,5 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclrtFree(mulsOutDeviceAddr);
     aclrtFree(sinOutDeviceAddr);
     aclrtFree(cosOutDeviceAddr);
+    aclrtFree(permuteOutDeviceAddr);
 }

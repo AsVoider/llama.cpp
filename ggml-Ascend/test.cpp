@@ -278,14 +278,14 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 //     aclrtStream stream;
 //     auto ret = Init(deviceId, &stream);
 //     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret); return ret);
-//     const int64_t ne0[4] = {16, 32, 1, 1};
-//     const int64_t ne1[4] = {16, 32, 1, 1};
-//     const int64_t ne[4] = {32, 32, 1, 1};
-
+//     const int64_t ne0[4] = {4, 8, 2, 1};
+//     const int64_t ne1[4] = {4, 8, 8, 1};
+//     const int64_t ne[4] = {8, 8, 8, 1};
+// 
 //     // 2. 构造输入与输出，需要根据API的接口自定义构造
-//     std::vector<int64_t> selfShape = {1, 1, 32, 16};
-//     std::vector<int64_t> otherShape = {1, 1, 32, 16};
-//     std::vector<int64_t> outShape = {1, 1, 32, 32};
+//     std::vector<int64_t> selfShape = {ne0[3], ne0[2], ne0[1], ne0[0]};
+//     std::vector<int64_t> otherShape = {ne1[3], ne1[2], ne1[1], ne1[0]};
+//     std::vector<int64_t> outShape = {ne[3], ne[2], ne[1], ne[0]};
 //     void* selfDeviceAddr = nullptr;
 //     void* otherDeviceAddr = nullptr;
 //     void* outDeviceAddr = nullptr;
@@ -293,20 +293,20 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 //     aclTensor* other = nullptr;
 //     aclScalar* alpha = nullptr;
 //     aclTensor* out = nullptr;
-//     std::vector<aclFloat16> selfHostData(512, aclFloatToFloat16(1.0));
-//     std::vector<float> otherHostData(512, 1);
-//     std::vector<float> outHostData(1024, 0);
-
+//     std::vector<aclFloat16> selfHostData(ne0[0] * ne0[1] * ne0[2] * ne0[3], aclFloatToFloat16(1.0));
+//     std::vector<float> otherHostData(ne1[0] * ne1[1] * ne1[2] * ne1[3], 1.0);
+//     std::vector<float> outHostData(ne[0] * ne[1] * ne[2] * ne[3], 0.0);
+// 
 //     ret = data_addr_malloc(selfShape, selfHostData, &selfDeviceAddr);
 //     CHECK_RET(ret == ACL_SUCCESS, return ret);
 //     ret = data_addr_malloc(otherShape, otherHostData, &otherDeviceAddr);
 //     CHECK_RET(ret == ACL_SUCCESS, return ret);
 //     ret = data_addr_malloc(outShape, outHostData, &outDeviceAddr);
 //     CHECK_RET(ret == ACL_SUCCESS, return ret);
-
+// 
 //     ggml_backend_ascend_context* ctx = new ggml_backend_ascend_context(deviceId);
 //     ctx->streams[deviceId][0] = stream;
-
+// 
 //     ggml_tensor* src0 = new ggml_tensor();
 //     src0->ne[0] = ne0[0];
 //     src0->ne[1] = ne0[1];
@@ -314,7 +314,7 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 //     src0->ne[3] = ne0[3];
 //     src0->type = GGML_TYPE_F16;
 //     src0->data = selfDeviceAddr;
-
+// 
 //     ggml_tensor* src1 = new ggml_tensor();
 //     src1->ne[0] = ne1[0];
 //     src1->ne[1] = ne1[1];
@@ -322,7 +322,7 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 //     src1->ne[3] = ne1[3];
 //     src1->type = GGML_TYPE_F32;
 //     src1->data = otherDeviceAddr;
-
+// 
 //     ggml_tensor* dst = new ggml_tensor();
 //     dst->ne[0] = ne[0];
 //     dst->ne[1] = ne[1];
@@ -332,10 +332,10 @@ int Init(int32_t deviceId, aclrtStream* stream) {
 //     dst->data = outDeviceAddr;
 //     dst->src[0] = src0;
 //     dst->src[1] = src1;
-
+// 
 //     ggml_ascend_mul_mat(*ctx, src0, src1, dst);
 //     CHECK_RET(ret == ACL_SUCCESS, return ret);
-
+// 
 //     auto size = GetShapeSize(outShape);
 //     std::vector<float> resultData(size, 0);
 //     ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), outDeviceAddr,

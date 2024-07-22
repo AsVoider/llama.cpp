@@ -15,10 +15,12 @@ set(CMAKE_CXX_FLAGS_DEBUG "-fPIC -O0 -g -Wall")
 set(CMAKE_CXX_FLAGS_RELEASE "-fPIC -O2 -Wall")
 
 set(BASE_LLAMA_DIR "/home/powerinfer/Desktop/tz/llama/llama.cpp")
+# set(BASE_LLAMA_DIR "/home/powerinfer/CYM/llama.cpp")
 file(GLOB SRC_LIST ${BASE_LLAMA_DIR}/*.cpp ${BASE_LLAMA_DIR}/*.h ${BASE_LLAMA_DIR}/*.c)
 
 # 设置可执行文件名（如test_1），并指定待运行算子文件*.cpp所在目录
 add_executable(test
+        # test.cpp
         main.cpp
         aclnn-test.cpp
         aclnn-compute.cpp
