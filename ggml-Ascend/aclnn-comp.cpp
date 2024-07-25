@@ -5,6 +5,7 @@
 #include "common.h"
 #include "aclnn-comp.h"
 #include "aclnnop/aclnn_softmax.h"
+#include "aclnnop/aclnn_masked_softmax_with_rel_pos_bias.h"
 
 int aclnn_soft_max_func(void* selfDataAddr, void* outDataAddr,
   aclnn_shape_t& selfShape, aclnn_shape_t& outShape,
@@ -41,6 +42,92 @@ int aclnn_soft_max_func(void* selfDataAddr, void* outDataAddr,
   aclDestroyTensor(out);
 
   return 0;
+}
+
+int aclnn_soft_max_func(void * dataAddr, void * maskAddr, float scale, void * outAddr,
+    aclnn_shape_t & dataShape, aclnn_shape_t & maskShape, aclnn_shape_t & outShape,
+    aclDataType dataType, aclDataType maskType, aclDataType outType, aclrtStream & stream) {
+  auto ret(0);
+
+  aclTensor * dataTensor(nullptr);
+  ret = create_acl_tensor(dataShape, dataType, &dataAddr, &dataTensor);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  aclTensor * maskTensor(nullptr);
+  ret = create_acl_tensor(maskShape, maskType, &maskAddr, &maskTensor);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  aclTensor * outTensor(nullptr);
+  ret = create_acl_tensor(outShape, outType, &outAddr, &outTensor);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+  aclTensor * biasTensor(nullptr);
+  void * biasAddr(nullptr);
+  int64_t sz(dataShape[0] * dataShape[1] * dataShape[2] * dataShape[3]);
+  ret = aclrtMalloc(&biasAddr, sz * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = aclrtMemset(biasAddr, sz * sizeof(float), 0, sz * sizeof(float));
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  // std::vector<float> bias(sz, 0);
+  aclnn_shape_t biasShape{dataShape[0], dataShape[1], dataShape[2], dataShape[3]};
+  ret = create_acl_tensor(biasShape, outType, &biasAddr, &biasTensor);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+
+  // {
+  //   printf("datatype is %d, masktype is %d, outtype is %d\n", dataType, maskType, outType);
+  //   float d[32], m[32], o[32];
+  //   aclrtMemcpy((void *)d, 32 * 4, dataAddr, 32 * 4, ACL_MEMCPY_DEVICE_TO_HOST);
+  //   aclrtMemcpy((void *)m, 32 * 4, maskAddr, 32 * 4, ACL_MEMCPY_DEVICE_TO_HOST);
+  //   for (auto dt : d) {
+  //     printf("%f ", dt);
+  //   }
+  //   printf("\n");
+  //   for (auto mt : m) {
+  //     printf("%f ", mt);
+  //   }
+  //   printf("\n");
+  //   // aclrtMemcpy((void *)d, 32 * 4, dataAddr, 32 * 4, ACL_MEMCPY_DEVICE_TO_HOST);
+  //   for (auto &sp : dataShape) {
+  //       printf("%ld ", sp);
+  //   }
+  //   printf("\n");
+  //   for (auto &sp : maskShape) {
+  //       printf("%ld ", sp);
+  //   }
+  //   printf("\n");
+  //   for (auto &sp : biasShape) {
+  //       printf("%ld ", sp);
+  //   }
+  //   printf("\n");
+  //   for (auto &sp : outShape) {
+  //       printf("%ld ", sp);
+  //   }
+  //   printf("\n");
+  //   printf("sacle is %f\n", scale);
+  // }
+
+  uint64_t workSpaceSize(0);
+  aclOpExecutor * exe;
+
+  ret = aclnnMaskedSoftmaxWithRelPosBiasGetWorkspaceSize(dataTensor, maskTensor, biasTensor, scale, 0, outTensor, &workSpaceSize, &exe); // for test
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("failed at get sm workspace: %d %s\n", ret, aclGetRecentErrMsg());return ret);
+
+  void* workspaceAddr = nullptr;
+  if (workSpaceSize > 0) {
+    ret = aclrtMalloc(&workspaceAddr, workSpaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+  }
+
+  ret = aclnnMaskedSoftmaxWithRelPosBias(workspaceAddr, workSpaceSize, exe, stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMaskedSoftmaxWithRelPosBias failed. ERROR: %d\n", ret); return ret);
+
+  ret = aclrtSynchronizeStream(stream);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  aclDestroyTensor(dataTensor);
+  aclDestroyTensor(maskTensor);
+  aclDestroyTensor(biasTensor);
+  aclDestroyTensor(outTensor);
+  return ret;
 }
 
 int acl_soft_max_func(void* selfDataAddr, void* outDataAddr, aclnn_shape_t& selfShape, aclnn_shape_t& outShape,

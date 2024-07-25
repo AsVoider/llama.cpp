@@ -11,6 +11,10 @@ int aclnn_soft_max_func(void* selfDataAddr, void* outDataAddr,
   aclDataType selfDataType, aclDataType outDataType,
   aclrtStream &stream);
 
+int aclnn_soft_max_func(void * dataAddr, void * maskAddr, float scale, void * outAddr,
+    aclnn_shape_t & dataShape, aclnn_shape_t & maskShape, aclnn_shape_t & outShape,
+    aclDataType dataType, aclDataType maskType, aclDataType outType, aclrtStream & stream);
+
 void aclnnSoftMaxTest();
 
 #endif

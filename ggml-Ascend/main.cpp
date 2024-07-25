@@ -7,6 +7,7 @@
 #include "aclnn-norm.h"
 #include "aclnn-add.h"
 #include "aclnn-math.h"
+#include "aclnn-compute.h"
 
 // int main() {
 // 
@@ -60,3 +61,25 @@
 //   return 0;
 // }
 // 
+
+int main() {
+
+    int32_t deviceId = 0;
+    aclrtContext context;
+    aclrtStream stream;
+    auto ret = Init(deviceId, &context, &stream);
+
+    int64_t ne0[] {8, 2, 2, 1};
+    int64_t ne1[] {8, 2, 1, 1};
+
+    std::vector<float> xHostData{  1.0, 1, 1, 1, 1, 1, 1, 1,
+        1,1,1,1, 2,2,2,2,
+        1.0, 1, 1, 1, 1, 1, 1, 1,
+        1,1,2,2, 1,1,2,2, };
+    std::vector<float> attenMaskOptionalHostData = {1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    std::vector<float> relativePosBiasHostData = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    std::vector<float> outHostData = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+    float a = 1.0;
+    ggml_ascend_soft_max_test(ne0, ne1, xHostData.data(), attenMaskOptionalHostData.data(), a, stream);
+    return 0;
+}

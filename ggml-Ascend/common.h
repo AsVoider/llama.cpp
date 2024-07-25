@@ -194,7 +194,7 @@ struct ggml_backend_ascend_context {
 
         // todo Check: fixed
         auto ret = aclrtSetDevice(device);
-        this->device = device;
+        // this->device = device;
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl set device failed at [ggml_ascend_set_device]: %d\n", ret); return);
     }
 

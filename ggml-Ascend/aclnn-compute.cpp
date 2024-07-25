@@ -161,7 +161,7 @@ void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rms_norm failed. ERROR: %d\n", ret); return);
 
     float eps;
-    memcpy(&eps, dst->op_params, sizeof(float));
+    memcpy(&eps, (float*)dst->op_params+0, sizeof(float));
 
     ret = aclnn_rms_norm_func(src0->data, gammaDeviceAddr, dst->data, rstdDeviceAddr,
                                 xShape, gammaShape, yShape, rstdShape,
@@ -173,16 +173,41 @@ void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclrtFree(rstdDeviceAddr);
 }
 
+void ggml_ascend_soft_max_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
+    auto src0 = dst->src[0], src1 = dst->src[1];
+    auto stream = ctx.stream();
+
+    GGML_TENSOR_BINARY_OP_LOCALS
+
+    auto dataAddr = src0->data;
+    auto maskAddr = src1->data;
+    auto outAddr = dst->data;
+
+    float scale;
+    memcpy((void *)&scale, (void *)&dst->op_params[0], sizeof(float));
+
+    aclnn_shape_t dataShape{1, ne02, ne01, ne00};
+    aclnn_shape_t maskShape{1, ne01, ne10};
+    aclnn_shape_t outShape{1, ne02, ne01, ne00};
+
+    auto ret = aclnn_soft_max_func(dataAddr, maskAddr, scale, outAddr, dataShape, maskShape, outShape, 
+    ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type], stream);
+
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("%s failed. ERROR: %d\n", __func__, ret); return);
+}
+
 void ggml_ascend_soft_max(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
-    ggml_tensor* src0 = dst->src[0];
-    ggml_tensor* src1 = dst->src[1];
+    ggml_tensor* src0 = dst->src[0]; // 
+    ggml_tensor* src1 = dst->src[1]; // mask
     aclrtStream stream = ctx.stream();
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
     void* mulsSelfDeviceAddr = src0->data;
     void* mulsOutDeviceAddr = nullptr;
-    float scale = dst->op_params[0];
+    // float scale = dst->op_params[0];
+    float scale;
+    memcpy((void *)&scale, (void *)&dst->op_params[0], sizeof(float));
     aclnn_shape_t mulsSelfShape = {ne00, ne01, ne02, ne03};
     aclnn_shape_t mulsOutShape = mulsSelfShape;
     std::vector<float> mulsOutHostData(ne00 * ne01 * ne02 * ne03, 0);
