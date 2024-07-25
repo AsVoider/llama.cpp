@@ -7,7 +7,7 @@
 int aclnn_repeat_func(void* selfDataAddr, void* outDataAddr,
     aclnn_shape_t& selfShape, aclnn_shape_t& outShape,
     aclDataType selfDataType, aclDataType outDataType,
-    vector<int64_t>& repeatsArray, aclrtStream &stream) {
+    std::vector<int64_t>& repeatsArray, aclrtStream &stream) {
     
     auto ret = 0;
 
