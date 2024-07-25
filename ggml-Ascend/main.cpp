@@ -1,5 +1,6 @@
 #include <iostream>
 #include <chrono>
+#include <cmath>
 #include <vector>
 #include "acl/acl.h"
 #include "common.h"
@@ -72,7 +73,7 @@ int main() {
     int64_t ne0[] {8, 2, 2, 1};
     int64_t ne1[] {8, 2, 1, 1};
 
-    std::vector<float> xHostData{  1.0, 1, 1, 1, 1, 1, 1, 1,
+    std::vector<float> xHostData{  0.0, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY, -INFINITY,
         1,1,1,1, 2,2,2,2,
         1.0, 1, 1, 1, 1, 1, 1, 1,
         1,1,2,2, 1,1,2,2, };

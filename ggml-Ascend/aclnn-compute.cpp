@@ -186,9 +186,9 @@ void ggml_ascend_soft_max_new(ggml_backend_ascend_context & ctx, ggml_tensor * d
     float scale;
     memcpy((void *)&scale, (void *)&dst->op_params[0], sizeof(float));
 
-    aclnn_shape_t dataShape{1, ne02, ne01, ne00};
-    aclnn_shape_t maskShape{1, ne01, ne10};
-    aclnn_shape_t outShape{1, ne02, ne01, ne00};
+    aclnn_shape_t dataShape{ne03, ne02, ne01, ne00};
+    aclnn_shape_t maskShape{ne12, ne01, ne10};
+    aclnn_shape_t outShape{ne3, ne2, ne1, ne0};
 
     auto ret = aclnn_soft_max_func(dataAddr, maskAddr, scale, outAddr, dataShape, maskShape, outShape, 
     ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type], stream);
