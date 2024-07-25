@@ -10,6 +10,7 @@
 #include "aclnn-math.h"
 #include "aclnn-rope.h"
 #include "aclnn-permute.h"
+#include "aclnn-repeat.h"
 #include <cstring>
 #include <cmath>
 #include <algorithm>
@@ -447,10 +448,18 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     void* mulOtherDeviceAddr = nullptr;
     ret = aclrtMalloc(&mulOtherDeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
-    for (int i = 0; i < size; i += ne[0] / 2) {
-        ret = aclrtMemcpy((void *)((float *)mulOtherDeviceAddr + i), ne[0] / 2 * sizeof(float), powOutDeviceAddr, ne[0] / 2 * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
-    }
+    // for (int i = 0; i < size; i += ne[0] / 2) {
+    //     ret = aclrtMemcpy((void *)((float *)mulOtherDeviceAddr + i), ne[0] / 2 * sizeof(float), powOutDeviceAddr, ne[0] / 2 * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
+    //     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    // }
+    aclnn_shape_t repeatSelfShape = {1, 1, ne[0]/2};
+    aclnn_shape_t repeatOutShape = {ne[2], ne[1], ne[0]};
+    std::vector<int64_t> repeatsArray = {ne[2], ne[1], 2};
+    ret = aclnn_repeat_func(powOutDeviceAddr, mulOtherDeviceAddr,
+                            repeatSelfShape, repeatOutShape,
+                            ACL_FLOAT, ACL_FLOAT,
+                            repeatsArray, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
     // std::vector<float> mulOtherHostData(size, 0);
     // std::generate_n(mulOtherHostData.begin(), size, [&, index = 0]() mutable {
@@ -473,10 +482,18 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
     ret = aclrtMalloc(&mulSelfDeviceAddr, size * sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
-    for (int i = 0; i < size; i += ne[2]) {
-        ret = aclrtMemcpy((void *)((int32_t *)mulSelfDeviceAddr + i), ne[2] * sizeof(int32_t), pos, ne[2] * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_DEVICE);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
-    }
+    // for (int i = 0; i < size; i += ne[2]) {
+    //     ret = aclrtMemcpy((void *)((int32_t *)mulSelfDeviceAddr + i), ne[2] * sizeof(int32_t), pos, ne[2] * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_DEVICE);
+    //     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    // }
+    aclnn_shape_t repeatSelfShape2 = {ne[2], 1, 1};
+    aclnn_shape_t repeatOutShape2 = {ne[2], ne[1], ne[0]};
+    std::vector<int64_t> repeatsArray2 = {1, ne[1], ne[0]};
+    ret = aclnn_repeat_func(pos, mulSelfDeviceAddr,
+                            repeatSelfShape2, repeatOutShape2,
+                            ACL_INT32, ACL_INT32,
+                            repeatsArray2, stream);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
     // std::vector<float> mulSelfHostData(size, 0);
     // std::generate_n(mulSelfHostData.begin(), size, [&, index = 0]() mutable {
