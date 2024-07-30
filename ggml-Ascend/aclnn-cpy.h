@@ -9,7 +9,7 @@
 int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
     aclnn_shape_t& selfRefShape, aclnn_shape_t& srcShape,
     aclDataType selfRefDataType, aclDataType srcDataType,
-    aclrtStream &stream);
+    aclrtStream &stream, size_t *selfRef_nb = nullptr, size_t *src_nb = nullptr);
 
 int aclnnCpyFunc(std::vector<int64_t>& selfRefShape, std::vector<int64_t>& srcShape, std::vector<float>& selfRefHostData, std::vector<float>& srcHostData,  float* dst, aclrtContext &context, aclrtStream &stream);
 
