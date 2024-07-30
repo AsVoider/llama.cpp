@@ -126,10 +126,16 @@ void ggml_ascend_cpy(ggml_backend_ascend_context &ctx, ggml_tensor *src, ggml_te
     // std::cout<<"dst name: "<<dst->name<<std::endl;
 
 
+    // int ret = aclnn_cpy_func(dst->data, src->data,
+    //                         dstShape, srcShape,
+    //                         ggml_to_acl_map[dst->type], ggml_to_acl_map[src->type],
+    //                         stream);
+
     int ret = aclnn_cpy_func(dst->data, src->data,
                             dstShape, srcShape,
                             ggml_to_acl_map[dst->type], ggml_to_acl_map[src->type],
-                            stream);
+                            stream,
+                            dst->nb, src->nb);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_cpy failed. ERROR: %d\n", ret); return);
 }
 
