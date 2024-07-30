@@ -22,38 +22,48 @@ void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
+    // FILE * f = fopen("get_rows_npu_bamboo.txt", "a");
+    // fprintf(f, "get_rows_npu\n");
+    // fprintf(f, "src0 type: %d\n", src0->type);
+    // fprintf(f, "src1 type: %d\n", src1->type);
+    // fprintf(f, "dst type: %d\n", dst->type);
+    // fprintf(f, "src0 ne: %ld %ld %ld %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+    // fprintf(f, "src1 ne: %ld %ld %ld %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+    // fprintf(f, "dst ne: %ld %ld %ld %ld\n", dst->ne[0], dst->ne[1], dst->ne[2], dst->ne[3]);
+    // fclose(f);
+
     aclnn_shape_t selfShape = {1, 1, ne01 * ne02 * ne03, ne00};
     aclnn_shape_t indexShape = {ne10 * ne11 * ne12};
     aclnn_shape_t outShape = {1, 1, ne10 * ne11 * ne12, ne00};
-    std::vector<int64_t> tmpHostData(ne10 * ne11 * ne12 * ne13, 0);
-    std::vector<int64_t> offset;
-    for(int i = 0; i < ne11 * ne12 * ne13; i++) {
-        offset.insert(offset.end(), ne10, i * ne01);
-    }
+//     std::vector<int64_t> tmpHostData(ne10 * ne11 * ne12 * ne13, 0);
+//     std::vector<int64_t> offset;
+//     for(int i = 0; i < ne11 * ne12 * ne13; i++) {
+//         offset.insert(offset.end(), ne10, i * ne01);
+//     }
+// 
+//     void* offsetDeviceAddr = nullptr;
+//     void* tmpDeviceAddr = nullptr;
+//     
+//     int ret = data_addr_malloc(indexShape, offset, &offsetDeviceAddr);
+//     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
+// 
+//     ret = data_addr_malloc(indexShape, tmpHostData, &tmpDeviceAddr);
+//     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
+// 
+//     ret = aclnn_add_func(src1->data, offsetDeviceAddr, tmpDeviceAddr,
+//                         indexShape, indexShape, indexShape,
+//                         ggml_to_acl_map[src1->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[src1->type],
+//                         stream);
+//     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
 
-    void* offsetDeviceAddr = nullptr;
-    void* tmpDeviceAddr = nullptr;
-    
-    int ret = data_addr_malloc(indexShape, offset, &offsetDeviceAddr);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
-
-    ret = data_addr_malloc(indexShape, tmpHostData, &tmpDeviceAddr);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
-
-    ret = aclnn_add_func(src1->data, offsetDeviceAddr, tmpDeviceAddr,
-                        indexShape, indexShape, indexShape,
-                        ggml_to_acl_map[src1->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[src1->type],
-                        stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
-
-    ret = aclnn_get_rows_func(src0->data, tmpDeviceAddr, dst->data,
+    auto ret = aclnn_get_rows_func(src0->data, src1->data, dst->data,
                             selfShape, indexShape, outShape,
                             ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type],
                             stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
 
-    aclrtFree(offsetDeviceAddr);
-    aclrtFree(tmpDeviceAddr);
+    // aclrtFree(offsetDeviceAddr);
+    // aclrtFree(tmpDeviceAddr);
 }
 
 void ggml_ascend_add(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
@@ -116,10 +126,16 @@ void ggml_ascend_cpy(ggml_backend_ascend_context &ctx, ggml_tensor *src, ggml_te
     // std::cout<<"dst name: "<<dst->name<<std::endl;
 
 
+    // int ret = aclnn_cpy_func(dst->data, src->data,
+    //                         dstShape, srcShape,
+    //                         ggml_to_acl_map[dst->type], ggml_to_acl_map[src->type],
+    //                         stream);
+
     int ret = aclnn_cpy_func(dst->data, src->data,
                             dstShape, srcShape,
                             ggml_to_acl_map[dst->type], ggml_to_acl_map[src->type],
-                            stream);
+                            stream,
+                            dst->nb, src->nb);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_cpy failed. ERROR: %d\n", ret); return);
 }
 

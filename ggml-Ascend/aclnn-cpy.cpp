@@ -9,16 +9,16 @@
 int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
     aclnn_shape_t& selfRefShape, aclnn_shape_t& srcShape,
     aclDataType selfRefDataType, aclDataType srcDataType,
-    aclrtStream &stream) {
+    aclrtStream &stream, size_t *selfRef_nb, size_t *src_nb) {
     
     auto ret = 0;
 
     aclTensor* selfRef = nullptr;
     aclTensor* src = nullptr;
 
-    ret = create_acl_tensor(selfRefShape, selfRefDataType, &selfRefDataAddr, &selfRef);
+    ret = create_acl_tensor(selfRefShape, selfRefDataType, &selfRefDataAddr, &selfRef, selfRef_nb);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
-    ret = create_acl_tensor(srcShape, srcDataType, &srcDataAddr, &src);
+    ret = create_acl_tensor(srcShape, srcDataType, &srcDataAddr, &src, src_nb);
     CHECK_RET(ret == ACL_SUCCESS, return ret);
     
     uint64_t workspaceSize = 0;
