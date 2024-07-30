@@ -112,6 +112,68 @@ int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** d
     return 0;
 }
 
+aclTensor * ggml_ascend_create_tensor(const ggml_tensor * tensor, int64_t * ne, size_t* nb = nullptr, int64_t dims = 0,
+                             aclFormat format = ACL_FORMAT_ND,
+                             size_t offset = 0) {
+  int64_t acl_ne[GGML_MAX_DIMS * 2], acl_stride[GGML_MAX_DIMS * 2];
+
+  int64_t acl_storage_len(0);
+  if (ne == nullptr) {
+    acl_storage_len = ggml_nbytes(tensor);
+    for (auto i(0); i < GGML_MAX_DIMS; i++) {
+      acl_ne[i] = tensor->ne[i];
+      acl_stride[i] = tensor->nb[i] / ggml_element_size(tensor);
+    }
+  } else {
+    for (auto i(0); i < dims; i++) {
+      acl_storage_len += (ne[i] - 1) * nb[i];
+      acl_ne[i] = ne[i];
+      acl_stride[i] = nb[i] / ggml_element_size(tensor);
+    }
+  }
+
+
+  int64_t final_dims(dims == 0 ? GGML_MAX_DIMS : dims);
+  std::reverse(acl_ne, acl_ne + final_dims);
+  std::reverse(acl_stride, acl_stride + final_dims);
+
+  auto acl_tensor = aclCreateTensor(
+    acl_ne, final_dims, ggml_to_acl_map[tensor->type], acl_stride,
+    offset / ggml_element_size(tensor), format, &acl_storage_len, 1,
+    tensor->data
+  );
+
+  return acl_tensor;
+}
+
+aclTensor* ggml_cann_create_tensor(void* data_ptr, aclDataType dtype,
+                                   size_t type_size, int64_t* ne, size_t* nb,
+                                   int64_t dims, aclFormat format,
+                                   size_t offset) {
+    int64_t tmp_ne[GGML_MAX_DIMS * 2];
+    int64_t tmp_stride[GGML_MAX_DIMS * 2];
+
+    memcpy(tmp_ne, ne, dims * sizeof(int64_t));
+    for (int i = 0; i < dims; i++) {
+        tmp_stride[i] = nb[i] / type_size;
+    }
+
+    std::reverse(tmp_ne, tmp_ne + dims);
+    std::reverse(tmp_stride, tmp_stride + dims);
+
+    int64_t acl_storage_len = 0;
+    for (int i = 0; i < dims; i++) {
+        acl_storage_len += (ne[i] - 1) * nb[i];
+    }
+
+    aclTensor* acl_tensor =
+        aclCreateTensor(tmp_ne, dims, dtype, tmp_stride, offset / type_size,
+                        format, &acl_storage_len, 1, data_ptr);
+
+    return acl_tensor;
+}
+
+
 int addr_malloc(const aclnn_shape_t& shape, void** deviceAddr, size_t size_t) {
     auto size = GetShapeSize(shape) * size_t;
     // 调用aclrtMalloc申请device侧内存

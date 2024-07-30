@@ -16648,8 +16648,41 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
                 ggml_compute_forward_diag_mask_zero(params, tensor);
             } break;
         case GGML_OP_SOFT_MAX:
-            {
+            {   
+                // FILE *sm0 = fopen("./sm0.txt", "a+");
+                // FILE *sm1 = fopen("./sm1.txt", "a+");
+                // FILE *sm2 = fopen("./sm2.txt", "a+");
+
+                // int64_t number_nums0 = tensor->src[0]->ne[0] * tensor->src[0]->ne[1] * tensor->src[0]->ne[2] * tensor->src[0]->ne[3];
+                // float *ptr2data = (float *)tensor->src[0]->data;
+                // fprintf(sm0, "%ld %ld %ld %ld\n", tensor->src[0]->ne[0], tensor->src[0]->ne[1], tensor->src[0]->ne[2], tensor->src[0]->ne[3]);
+                // for (int64_t i = 0; i < number_nums0; i++) {
+                //     fprintf(sm0, "%f ", ptr2data[i]);
+                // }
+                // fprintf(sm0, "\n");
+
+                // int64_t number_nums1 = tensor->src[1]->ne[0] * tensor->src[1]->ne[1] * tensor->src[1]->ne[2] * tensor->src[1]->ne[3];
+                // fprintf(sm1, "%ld %ld %ld %ld\n", tensor->src[1]->ne[0], tensor->src[1]->ne[1], tensor->src[1]->ne[2], tensor->src[1]->ne[3]);
+                // ptr2data = (float *)tensor->src[1]->data;
+                // for (int64_t i = 0; i < number_nums1; i++) {
+                //     fprintf(sm1, "%f ", ptr2data[i]);
+                // }
+                // fprintf(sm1, "\n");
+
                 ggml_compute_forward_soft_max(params, tensor);
+                
+                // int64_t number_nums2 = tensor->ne[0] * tensor->ne[1] * tensor->ne[2] * tensor->ne[3];
+                // fprintf(sm2, "%ld %ld %ld %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);
+                // ptr2data = (float *)tensor->data;
+                // for (int64_t i = 0; i < number_nums2; i++) {
+                //     fprintf(sm2, "%f", ptr2data[i]);
+                // }
+                // fprintf(sm2, "\n");
+
+                // fclose(sm0);
+                // fclose(sm1);
+                // fclose(sm2);
+                // exit(0);
             } break;
         case GGML_OP_SOFT_MAX_BACK:
             {

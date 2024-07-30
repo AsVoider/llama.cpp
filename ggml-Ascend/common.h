@@ -9,6 +9,7 @@
 #include <iostream>
 #include <vector>
 #include <memory>
+#include <cstring>
 
 #include "ggml.h"
 #include "ggml-ascend.h"
@@ -65,6 +66,14 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
 }
 
 int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** deviceAddr, aclTensor** tensor);
+aclTensor * ggml_ascend_create_tensor(const ggml_tensor * tensor, 
+                             int64_t * ne = nullptr, size_t* nb = nullptr, int64_t dims = 0,
+                             aclFormat format = ACL_FORMAT_ND,
+                             size_t offset = 0);
+aclTensor* ggml_cann_create_tensor(void* data_ptr, aclDataType dtype,
+                             size_t type_size, int64_t* ne, size_t* nb,
+                             int64_t dims, aclFormat format = ACL_FORMAT_ND,
+                             size_t offset = 0);
 
 void ggml_ascend_set_device(int device);
 int ggml_ascend_get_device();
