@@ -340,9 +340,14 @@ void ggml_ascend_mul_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2
     ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), outDeviceAddr,
                         size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
+    FILE * f = fopen("mul_real.txt","w");
+    fprintf(f, "real_dst : { ");
     for (int64_t i = 0; i < size; i++) {
         LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+        fprintf(f, "%f ,", resultData[i]);
     }
+    fprintf(f, "} ");
+    fclose(f);
 }
 
 void ggml_ascend_get_rows_test(int64_t*ne1, int64_t*ne2, float* data1, int64_t* data2, int32_t deviceId, aclrtStream stream){
@@ -468,4 +473,69 @@ void ggml_ascend_soft_max_test(int64_t* ne1, int64_t* ne2, float* data1, float* 
     for (int64_t i = 0; i < size; i++) {
        printf("result[%ld] is: %f\n", i, res[i]);
     }
+}
+
+void ggml_ascend_rms_norm_test(int64_t* ne, float* data ,int32_t deviceId, aclrtStream stream){
+    std::vector<int64_t> selfShape = {ne[3], ne[2], ne[1], ne[0]};
+    std::vector<int64_t> otherShape = {ne[3], ne[2], ne[1], ne[0]};
+    std::vector<int64_t> outShape = {ne[3], ne[2], ne[1], ne[0]};
+    void* selfDeviceAddr = nullptr;
+    void* otherDeviceAddr = nullptr;
+    void* outDeviceAddr = nullptr;
+    aclTensor* self = nullptr;
+    aclTensor* other = nullptr;
+    aclScalar* alpha = nullptr;
+    aclTensor* out = nullptr;
+    std::vector<float> selfHostData(data, data+ ne[3]*ne[2]*ne[1]*ne[0]);
+    std::vector<float> otherHostData = {1, 1, 1, 2, 2, 2, 3, 3};
+    std::vector<float> outHostData(ne[3]*ne[2]*ne[1]*ne[0], 0);
+
+    auto ret = data_addr_malloc(selfShape, selfHostData, &selfDeviceAddr);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+    ret = data_addr_malloc(otherShape, otherHostData, &otherDeviceAddr);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+    ret = data_addr_malloc(outShape, outHostData, &outDeviceAddr);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    ggml_backend_ascend_context* ctx = new ggml_backend_ascend_context(deviceId);
+    ctx->streams[deviceId][0] = stream;
+
+    ggml_tensor* src0 = new ggml_tensor();
+    src0->ne[0] = ne[0];
+    src0->ne[1] = ne[1];
+    src0->ne[2] = ne[2];
+    src0->ne[3] = ne[3];
+    src0->type = GGML_TYPE_F32;
+    src0->data = selfDeviceAddr;
+
+    ggml_tensor* src1 = new ggml_tensor();
+    src1->ne[0] = ne[0];
+    src1->ne[1] = ne[1];
+    src1->ne[2] = ne[2];
+    src1->ne[3] = ne[3];
+    src1->type = GGML_TYPE_F32;
+    src1->data = otherDeviceAddr;
+
+    ggml_tensor* dst = new ggml_tensor();
+    dst->ne[0] = ne[0];
+    dst->ne[1] = ne[1];
+    dst->ne[2] = ne[2];
+    dst->ne[3] = ne[3];
+    dst->type = GGML_TYPE_F32;
+    dst->data = outDeviceAddr;
+    dst->src[0] = src0;
+    dst->src[1] = src1;
+
+    ggml_ascend_rms_norm(*ctx, dst);
+    CHECK_RET(ret == ACL_SUCCESS, return);
+
+    auto size = GetShapeSize(outShape);
+    std::vector<float> resultData(size, 0);
+    ret = aclrtMemcpy(resultData.data(), resultData.size() * sizeof(resultData[0]), outDeviceAddr,
+                        size * sizeof(resultData[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("copy result from device to host failed. ERROR: %d\n", ret); return);
+    for (int64_t i = 0; i < size; i++) {
+        LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
+    }
+    return;
 }
