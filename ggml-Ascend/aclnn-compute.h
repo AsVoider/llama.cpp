@@ -7,6 +7,31 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
+
+#include <aclnnop/aclnn_add.h>
+#include <aclnnop/aclnn_arange.h>
+#include <aclnnop/aclnn_argsort.h>
+#include <aclnnop/aclnn_cat.h>
+#include <aclnnop/aclnn_clamp.h>
+#include <aclnnop/aclnn_div.h>
+#include <aclnnop/aclnn_gelu.h>
+#include <aclnnop/aclnn_hardsigmoid.h>
+#include <aclnnop/aclnn_hardswish.h>
+#include <aclnnop/aclnn_leaky_relu.h>
+#include <aclnnop/aclnn_mul.h>
+#include <aclnnop/aclnn_relu.h>
+#include <aclnnop/aclnn_silu.h>
+#include <aclnnop/aclnn_tanh.h>
+#include <aclnnop/aclnn_copy.h>
+#include <aclnnop/aclnn_rms_norm.h>
+#include "aclnnop/aclnn_softmax.h"
+#include <aclnnop/aclnn_cast.h>
+#include <aclnnop/aclnn_pow_tensor_tensor.h>
+#include <aclnnop/aclnn_fill_scalar.h>
+#include <aclnnop/aclnn_roll.h>
+#include <aclnnop/aclnn_index_fill_tensor.h>
+#include <aclnnop/aclnn_matmul.h>
+
 #include "ggml.h"
 #include "common.h"
 
