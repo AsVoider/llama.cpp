@@ -536,12 +536,95 @@ static bool ggml_ascend_compute_forward(ggml_backend_ascend_context & ctx, struc
         case GGML_OP_DUP:
             ggml_ascend_dup(ctx, dst);
             break;
-        case GGML_OP_CPY:
+        case GGML_OP_CPY:{
+            // FILE *f = fopen("cpy_src_2.txt", "a");
+            // struct ggml_tensor* tensor = dst;
+            // struct ggml_tensor* src0 =tensor->src[0];
+            // struct ggml_tensor* src1 =tensor->src[1];
+            // fprintf(f, "src0 type: %d\n", src0->type);
+            // fprintf(f, "src1 type: %d\n", src1->type);
+            // fprintf(f, "dst type: %d\n", tensor->type);
+            // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+            // fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+            // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+            // fprintf(f, "src0 name: %s\n", src0->name);
+            // fprintf(f, "src1 name: %s\n", src1->name);
+            // fprintf(f, "dst name: %s\n", tensor->name);
+            // fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+            // fprintf(f, "src1 nb: %ld, %ld, %ld, %ld\n", src1->nb[0], src1->nb[1], src1->nb[2], src1->nb[3]);
+            // fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+            // fprintf(f, "src0 data: {");
+            // int64_t src0_size = src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3];
+            // std::vector<float> src0_vec(src0_size, 0);
+            // aclrtMemcpy(src0_vec.data(), src0_vec.size() * sizeof(src0_vec[0]), src0->data,
+            //                         src0_size * sizeof(src0_vec[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+            // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+            //     fprintf(f, "%f ,", src0_vec[i]);
+            // }
+            // fprintf(f, "}\n");
             ggml_ascend_cpy(ctx, dst->src[0], dst->src[1]);
+            // fprintf(f, "dst data: {");
+            // for(int index3 = 0 ; index3 < tensor->ne[3] ; index3++){
+            //     for(int index2 = 0 ; index2 < tensor->ne[2] ; index2++){
+            //         for(int index1 = 0 ; index1 < tensor->ne[1] ; index1++){
+            //             for(int index0 = 0 ; index0 < tensor->ne[0] ; index0++){
+            //                 aclFloat16 dst_data_temp;
+            //                 char * dst_ptr  = ((char *)  tensor->data + index0*tensor->nb[0]  + index1*tensor->nb[1]  + index2*tensor->nb[2]  + index3*tensor->nb[3]);
+            //                 aclrtMemcpy(&dst_data_temp, aclDataTypeSize(aclDataType::ACL_FLOAT16), ((aclFloat16 *)dst_ptr), aclDataTypeSize(aclDataType::ACL_FLOAT16), ACL_MEMCPY_DEVICE_TO_HOST);
+                                
+            //                 fprintf(f, "%f ,", aclFloat16ToFloat(dst_data_temp));   
+            //             }
+            //         }
+            //     }
+            // }
+            // fprintf(f, "}\n");
+            // fclose(f);
             break;
-        case GGML_OP_CONT:
+        }
+        case GGML_OP_CONT: {
+            // FILE *f = fopen("cpy_src_2.txt", "a");
+            // struct ggml_tensor* tensor = dst;
+            // struct ggml_tensor* src0 =tensor->src[0];
+            // struct ggml_tensor* src1 =tensor->src[1];
+            // fprintf(f, "src0 type: %d\n", src0->type);
+            // fprintf(f, "src1 type: %d\n", src1->type);
+            // fprintf(f, "dst type: %d\n", tensor->type);
+            // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+            // fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+            // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+            // fprintf(f, "src0 name: %s\n", src0->name);
+            // fprintf(f, "dst name: %s\n", tensor->name);
+            // fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+            // fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+            // fprintf(f, "src0 data: {");
+            // int64_t src0_size = src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3];
+            // std::vector<float> src0_vec(src0_size, 0);
+            // aclrtMemcpy(src0_vec.data(), src0_vec.size() * sizeof(src0_vec[0]), src0->data,
+            //                         src0_size * sizeof(src0_vec[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+            // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+            //     fprintf(f, "%f ,", src0_vec[i]);
+            // }
+            // fprintf(f, "}\n");
+            
             ggml_ascend_dup(ctx, dst);
+            // fprintf(f, "dst data: {");
+            // for(int index3 = 0 ; index3 < tensor->ne[3] ; index3++){
+            //     for(int index2 = 0 ; index2 < tensor->ne[2] ; index2++){
+            //         for(int index1 = 0 ; index1 < tensor->ne[1] ; index1++){
+            //             for(int index0 = 0 ; index0 < tensor->ne[0] ; index0++){
+            //                 aclFloat16 dst_data_temp;
+            //                 char * dst_ptr  = ((char *)  tensor->data + index0*tensor->nb[0]  + index1*tensor->nb[1]  + index2*tensor->nb[2]  + index3*tensor->nb[3]);
+            //                 aclrtMemcpy(&dst_data_temp, aclDataTypeSize(aclDataType::ACL_FLOAT16), ((aclFloat16 *)dst_ptr), aclDataTypeSize(aclDataType::ACL_FLOAT16), ACL_MEMCPY_DEVICE_TO_HOST);
+                                
+            //                 fprintf(f, "%f ,", aclFloat16ToFloat(dst_data_temp));   
+            //             }
+            //         }
+            //     }
+            // }
+            // fprintf(f, "}\n");
+            // fclose(f);
             break;
+        }
         case GGML_OP_ADD:
             ggml_ascend_add(ctx, dst);
             break;
@@ -557,9 +640,39 @@ static bool ggml_ascend_compute_forward(ggml_backend_ascend_context & ctx, struc
                     return false;
             }   
             break;
-        case GGML_OP_RMS_NORM:
+        case GGML_OP_RMS_NORM:{
+            FILE *f = fopen("rms_npu_2.txt", "a");
+            struct ggml_tensor* tensor = dst;
+            struct ggml_tensor* src0 =tensor->src[0];
+            struct ggml_tensor* src1 =tensor->src[1];
+            fprintf(f, "src0 type: %d\n", src0->type);
+            fprintf(f, "dst type: %d\n", tensor->type);
+            fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+            fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+            fprintf(f, "src0 name: %s\n", src0->name);
+            fprintf(f, "dst name: %s\n", tensor->name);
+            fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+            fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+            fprintf(f, "src0 data: {");
+            int64_t src0_size = src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3];
+            std::vector<float> src0_vec(src0_size, 0);
+            aclrtMemcpy(src0_vec.data(), src0_vec.size() * sizeof(src0_vec[0]), src0->data,
+                                    src0_size * sizeof(src0_vec[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+            for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                fprintf(f, "%f ,", src0_vec[i]);
+            }
+            fprintf(f, "}\n");
             ggml_ascend_rms_norm(ctx, dst);
-            break;
+            fprintf(f, "dst data: {");
+            std::vector<float> dst_vec(src0_size, 0);
+            aclrtMemcpy(dst_vec.data(), dst_vec.size()* sizeof(dst_vec[0]), tensor->data,
+                                    src0_size* sizeof(dst_vec[0]), ACL_MEMCPY_DEVICE_TO_HOST);
+            for(int i=0 ; i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                fprintf(f, "%f, ", dst_vec[i]);
+            }
+            fprintf(f, "}\n");
+            fclose(f);
+            break;}
         case GGML_OP_MUL_MAT:
             if (dst->src[0]->ne[3] != dst->src[1]->ne[3]) {
                 GGML_ASCEND_LOG_ERROR("%s: cannot compute %s: src0->ne[3] = %" PRId64 ", src1->ne[3] = %" PRId64 " - fallback to CPU\n", __func__, dst->name, dst->src[0]->ne[3], dst->src[1]->ne[3]);
@@ -569,7 +682,7 @@ static bool ggml_ascend_compute_forward(ggml_backend_ascend_context & ctx, struc
             }
             break;
         case GGML_OP_SOFT_MAX:
-            ggml_ascend_soft_max(ctx, dst);
+            ggml_ascend_soft_max_new(ctx, dst);
             break;
         case GGML_OP_ROPE:
             ggml_ascend_rope(ctx, dst);
