@@ -411,10 +411,12 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclrtStream stream = ctx.stream();
 
     int64_t* ne = src0->ne;
-    float freq_scale = dst->op_params[6];
-    float freq_base = dst->op_params[5];
-    int n_dims = dst->op_params[1];
+    float freq_scale;
+    float freq_base;
+    int n_dims = ((int32_t *) dst->op_params)[1];
     void* pos = src1->data;
+    memcpy(&freq_base,   (int32_t *) dst->op_params +  5, sizeof(float));
+    memcpy(&freq_scale,  (int32_t *) dst->op_params +  6, sizeof(float));
 
     int64_t size = ne[0] * ne[1] * ne[2] * ne[3];
 
@@ -436,7 +438,7 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclnn_shape_t powExpShape = {ne[0]/2, 1};
     aclnn_shape_t powOutShape = powExpShape;
     for(decltype(powExpHostData.size()) i(0); i < powExpHostData.size(); i++){
-        powExpHostData[i] = i;
+        powExpHostData[i] = i + 1;
     }
     void* powExpDeviceAddr = nullptr;
     void* powOutDeviceAddr = nullptr;
