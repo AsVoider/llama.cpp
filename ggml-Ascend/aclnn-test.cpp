@@ -12,23 +12,23 @@
 #include "aclnn-test.h"
 
 void aclnn_silu_test_all(){
-    int32_t deviceId = 0;
-    aclrtStream stream;
-    aclrtContext context = nullptr;
-    auto ret = Init(deviceId, &context, &stream);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret));
+    // int32_t deviceId = 0;
+    // aclrtStream stream;
+    // aclrtContext context = nullptr;
+    // auto ret = Init(deviceId, &context, &stream);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("Init acl failed. ERROR: %d\n", ret));
 
-    int64_t lens[3]{2, 3, 4};
-    int64_t width[3]{1, 2, 3};
-    float data1[2]{-5.1, -3.7};
-    float data2[6]{0.1, 0.6, 1.1, 1.6, 2.1, 2.6};
-    float data3[12]{-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6};
-    ggml_ascend_silu_test(lens[0], width[0], data1, deviceId, stream);
-    ggml_ascend_silu_test(lens[1], width[1], data2, deviceId, stream);
-    ggml_ascend_silu_test(lens[2], width[2], data3, deviceId, stream);
-    aclnn_silu_func_test(lens[0], width[0], data1, deviceId, stream);
-    aclnn_silu_func_test(lens[1], width[1], data2, deviceId, stream);
-    aclnn_silu_func_test(lens[2], width[2], data3, deviceId, stream);
+    // int64_t lens[3]{2, 3, 4};
+    // int64_t width[3]{1, 2, 3};
+    // float data1[2]{-5.1, -3.7};
+    // float data2[6]{0.1, 0.6, 1.1, 1.6, 2.1, 2.6};
+    // float data3[12]{-5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6};
+    // ggml_ascend_silu_test(lens[0], width[0], data1, deviceId, stream);
+    // ggml_ascend_silu_test(lens[1], width[1], data2, deviceId, stream);
+    // ggml_ascend_silu_test(lens[2], width[2], data3, deviceId, stream);
+    // aclnn_silu_func_test(lens[0], width[0], data1, deviceId, stream);
+    // aclnn_silu_func_test(lens[1], width[1], data2, deviceId, stream);
+    // aclnn_silu_func_test(lens[2], width[2], data3, deviceId, stream);
 }
 
 

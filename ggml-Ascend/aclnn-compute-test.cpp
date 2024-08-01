@@ -13,10 +13,10 @@ void ggml_ascend_silu_test(int64_t lens, int64_t width, float* data, int32_t dev
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data, data+ lens* width);
     std::vector<float> otherHostData = {1, 1, 1, 2, 2, 2, 3, 3};
     std::vector<float> outHostData(lens* width, 0);
@@ -81,10 +81,10 @@ void ggml_ascend_cpy_test(int64_t* ne, float* data, int32_t deviceId, aclrtStrea
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data, data + ne[0]*ne[1]*ne[2]*ne[3]);
     std::vector<float> otherHostData(ne[0]*ne[1]*ne[2]*ne[3], 0);
     std::vector<float> outHostData(ne[0]*ne[1]*ne[2]*ne[3], 0);
@@ -146,10 +146,10 @@ void ggml_ascend_dup_test(int64_t* ne, float* data, int32_t deviceId, aclrtStrea
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data, data + ne[0]*ne[1]*ne[2]*ne[3]);
     std::vector<float> otherHostData(ne[0]*ne[1]*ne[2]*ne[3], 0);
     std::vector<float> outHostData(ne[0]*ne[1]*ne[2]*ne[3], 0);
@@ -218,10 +218,10 @@ void ggml_ascend_add_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data1, data1 + ne1[0]*ne1[1]*ne1[2]*ne1[3]);  
     std::vector<float> otherHostData(data2, data2 + ne2[0]*ne2[1]*ne2[2]*ne2[3]);
     std::vector<float> outHostData(outShape[0]*outShape[1]*outShape[2]*outShape[3], 0);
@@ -288,10 +288,10 @@ void ggml_ascend_mul_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data1, data1 + ne1[0]*ne1[1]*ne1[2]*ne1[3]);
     std::vector<float> otherHostData(data2, data2 + ne2[0]*ne2[1]*ne2[2]*ne2[3]);
     std::vector<float> outHostData(outShape[0]*outShape[1]*outShape[2]*outShape[3], 0);
@@ -357,10 +357,10 @@ void ggml_ascend_get_rows_test(int64_t*ne1, int64_t*ne2, float* data1, int64_t* 
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data1 ,data1+ ne1[0]*ne1[1]*ne1[2]*ne1[3]);
     std::vector<int64_t> otherHostData(data2, data2 + ne2[0]*ne2[1]*ne2[2]*ne2[3]);
     std::vector<float> outHostData(outShape[0]*outShape[1]*outShape[2]*outShape[3], 0);
@@ -416,6 +416,8 @@ void ggml_ascend_get_rows_test(int64_t*ne1, int64_t*ne2, float* data1, int64_t* 
 }
 
 void ggml_ascend_soft_max_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2, float s, aclrtStream stream) {
+    GGML_UNUSED(stream);
+
     auto src0(new ggml_tensor());
     auto src1(new ggml_tensor());
     auto dst(new ggml_tensor());
@@ -482,10 +484,10 @@ void ggml_ascend_rms_norm_test(int64_t* ne, float* data ,int32_t deviceId, aclrt
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data, data+ ne[3]*ne[2]*ne[1]*ne[0]);
     std::vector<float> otherHostData = {1, 1, 1, 2, 2, 2, 3, 3};
     std::vector<float> outHostData(ne[3]*ne[2]*ne[1]*ne[0], 0);

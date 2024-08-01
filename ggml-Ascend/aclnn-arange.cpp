@@ -91,4 +91,5 @@ void aclnnArangeTest(){
   float endValue = 5.0f;
   float stepValue = 1.0f;
   int ret = aclnnArangeFunc(startValue, endValue, stepValue);
+  GGML_UNUSED(ret);
 }

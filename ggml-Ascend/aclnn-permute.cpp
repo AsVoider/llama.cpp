@@ -2,6 +2,7 @@
 #include <vector>
 #include "common.h"
 #include "acl/acl.h"
+#include "aclnn-permute.h"
 #include "aclnnop/aclnn_permute.h"
 
 int aclnn_permute_func(void* selfDataAddr, void* outDataAddr,

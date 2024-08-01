@@ -18,6 +18,7 @@
   do {                              \
     printf(message, ##__VA_ARGS__); \
   } while (0) 
+int Init(int32_t deviceId, aclrtStream* stream);
 
 int Init(int32_t deviceId, aclrtStream* stream) {
   // 固定写法，AscendCL初始化

@@ -55,7 +55,60 @@ int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
     return 0;
 }
 
+int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
+    aclnn_shape_t& selfRefShape, aclnn_shape_t& srcShape,
+    aclDataType selfRefDataType, aclDataType srcDataType,
+    ggml_backend_ascend_context & ctx, size_t *selfRef_nb, size_t *src_nb) {
+    
+    auto ret = 0;
+
+    aclTensor* selfRef = nullptr;
+    aclTensor* src = nullptr;
+
+    ret = create_acl_tensor(selfRefShape, selfRefDataType, &selfRefDataAddr, &selfRef, selfRef_nb);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    ret = create_acl_tensor(srcShape, srcDataType, &srcDataAddr, &src, src_nb);
+    CHECK_RET(ret == ACL_SUCCESS, return ret);
+    
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor;
+
+    // std::cout<< "in aclnn_cpy_func :"<<std::endl;
+    // std::cout<<"selfRefDataType :"<<selfRefDataType<<std::endl;
+    // std::cout<<"srcDataTypeType :"<<srcDataType<<std::endl;
+
+
+    ret = aclnnInplaceCopyGetWorkspaceSize(selfRef, src, &workspaceSize, &executor);
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInplaceCopyGetWorkspaceSize failed. ERROR: %d\n", ret);  return ret);
+
+    // std::cout<<aclGetRecentErrMsg()<<std::endl;
+
+    void* workspaceAddr = nullptr;
+    if (workspaceSize > 0) {
+        // ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+        ggml_ascend_pool_alloc<char> workspace_allocator(ctx.pool(), workspaceSize);
+        workspaceAddr = static_cast<void *>(workspace_allocator.get());
+    }
+    ret = aclnnInplaceCopy(workspaceAddr, workspaceSize, executor, ctx.stream());
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnInplaceCopy failed. ERROR: %d\n", ret); return ret);
+
+    ret = aclrtSynchronizeStream(ctx.stream());
+    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+    aclDestroyTensor(selfRef);
+    aclDestroyTensor(src);
+
+    // if (workspaceSize > 0) {
+    //     aclrtFree(workspaceAddr);
+    // }
+
+    return 0;
+}
+
 int aclnnCpyFunc(std::vector<int64_t>& selfRefShape, std::vector<int64_t>& srcShape, std::vector<float>& selfRefHostData, std::vector<float>& srcHostData,  float* dst, aclrtContext &context, aclrtStream &stream){
+  GGML_UNUSED(context);
+  
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfRefDeviceAddr = nullptr;
   void* srcDeviceAddr = nullptr;
@@ -156,6 +209,55 @@ int aclnn_get_rows_func(void* selfDataAddr, void* indexDataAddr, void* outDataAd
 	return 0;
 }
 
+int aclnn_get_rows_func(void* selfDataAddr, void* indexDataAddr, void* outDataAddr,
+	aclnn_shape_t& selfShape, aclnn_shape_t& indexShape, aclnn_shape_t& outShape,
+	aclDataType selfDataType, aclDataType indexDataType, aclDataType outDataType,
+	ggml_backend_ascend_context & ctx) {
+	
+	auto ret = 0;
+
+	aclTensor* self = nullptr;
+	aclTensor* index = nullptr;
+	aclTensor* out = nullptr;
+
+	int64_t dim = 2;
+
+	ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
+	CHECK_RET(ret == ACL_SUCCESS, return ret);
+	ret = create_acl_tensor(indexShape, indexDataType, &indexDataAddr, &index);
+	CHECK_RET(ret == ACL_SUCCESS, return ret);
+	ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+	CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+	uint64_t workspaceSize = 0;
+	aclOpExecutor* executor;
+
+	ret = aclnnIndexSelectGetWorkspaceSize(self, dim, index, out, &workspaceSize, &executor);
+	CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnIndexSelectGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+	void* workspaceAddr = nullptr;
+	if (workspaceSize > 0) {
+		// ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+		// CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+    ggml_ascend_pool_alloc<char> workspace_allocator(ctx.pool(), workspaceSize);
+    workspaceAddr = static_cast<void *>(workspace_allocator.get());
+	}
+	ret = aclnnIndexSelect(workspaceAddr, workspaceSize, executor, ctx.stream());
+	CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnIndexSelect failed. ERROR: %d\n", ret); return ret);
+
+	ret = aclrtSynchronizeStream(ctx.stream());
+	CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+	aclDestroyTensor(self);
+	aclDestroyTensor(index);
+	aclDestroyTensor(out);
+
+	// if (workspaceSize > 0) {
+	// 	aclrtFree(workspaceAddr);
+	// }
+
+	return 0;
+}
+
 int aclnnGetRowsFunc(  std::vector<int64_t> &selfShape,
   std::vector<int64_t> &indexShape,
   std::vector<int64_t> &outShape,
@@ -163,7 +265,8 @@ int aclnnGetRowsFunc(  std::vector<int64_t> &selfShape,
   std::vector<float> &selfHostData,
   std::vector<int> &indexHostData,
   std::vector<float> &outHostData,float* dst, aclrtContext &context, aclrtStream &stream){
-  
+  GGML_UNUSED(context);
+
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfDeviceAddr = nullptr;
   void* indexDeviceAddr = nullptr;

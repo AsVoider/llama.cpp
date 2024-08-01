@@ -5,6 +5,7 @@
 #include "acl/acl.h"
 
 void aclnn_mul_func_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2, int32_t deviceId, aclrtStream stream){
+    GGML_UNUSED(deviceId);
 
     std::vector<int64_t> selfShape = {ne1[3], ne1[2], ne1[1], ne1[0]};
     std::vector<int64_t> otherShape = {ne2[3], ne2[2], ne2[1], ne2[0]};
@@ -17,10 +18,10 @@ void aclnn_mul_func_test(int64_t* ne1, int64_t* ne2, float* data1, float* data2,
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data1, data1 + ne1[0]*ne1[1]*ne1[2]*ne1[3]);
     std::vector<float> otherHostData(data2, data2 + ne2[0]*ne2[1]*ne2[2]*ne2[3]);
     std::vector<float> outHostData(outShape[0]*outShape[1]*outShape[2]*outShape[3], 0);

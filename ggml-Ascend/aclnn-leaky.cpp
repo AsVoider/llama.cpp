@@ -86,6 +86,7 @@ void aclnnLeakyReluTest(){
   std::vector<float> selfHostData = {-1, 2, 3, 4};
   std::vector<float> outHostData = {0, 0, 0, 0};
   float negativeSlopeValue = 0.01f;
-  float *dst;
+  float *dst(nullptr);
   int ret = aclnnLeakyReluFunc(selfShape, outShape, selfHostData, outHostData, negativeSlopeValue, dst);
+  GGML_UNUSED(ret);
 }

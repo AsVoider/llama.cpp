@@ -57,6 +57,8 @@ int aclnn_rope_func(void* queryDataAddr, void* keyDataAddr, void* cosDataAddr, v
 int aclnnRoPEFunc(std::vector<int64_t>& queryShape, std::vector<int64_t>& keyShape, std::vector<int64_t>& cosShape, std::vector<int64_t>& sinShape, 
     std::vector<float>& queryHostData, std::vector<float>& keyHostData, std::vector<float>& cosHostData, std::vector<float>& sinHostData, float* dst ,aclrtContext &context, aclrtStream &stream){
     // 2. 构造输入与输出，需要根据API的接口定义构造
+    GGML_UNUSED(context);
+    
     int64_t layout = 1;
 
     std::cout<< "Start RoPE"<<std::endl;

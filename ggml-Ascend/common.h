@@ -95,11 +95,11 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
     // 计算连续tensor的strides
     std::vector<int64_t> strides(shape.size(), 1);
     if(nb) {
-        for (int64_t i = 0; i < shape.size(); i++) {
+        for (decltype(shape.size()) i = 0; i < shape.size(); i++) {
             strides[shape.size() - 1 - i] = nb[i] / aclDataTypeSize(dataType);
         }
     } else {
-        for (int64_t i = shape.size() - 2; i >= 0; i--) {
+        for (decltype(shape.size()) i = shape.size() - 2; i >= 0; i--) {
             strides[i] = shape[i + 1] * strides[i + 1];
         }
     }
@@ -177,7 +177,7 @@ struct ggml_ascend_pool_alloc {
     T * alloc(size_t size) {
         GGML_ASSERT(pool != nullptr);
         GGML_ASSERT(ptr == nullptr);
-        ptr = (T *) pool->alloc(size * sizeof(T), &this->actual_size);
+        ptr = (T *) pool->alloc(size * (std::is_same<T, void>().value ? (size_t)1 : sizeof(T)), &this->actual_size);
         return ptr;
     }
 

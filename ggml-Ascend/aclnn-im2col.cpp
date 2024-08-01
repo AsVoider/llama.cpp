@@ -104,4 +104,5 @@ void aclnnIm2ColTest(){
   std::vector<float> outHostData = {0.0};
 
   int ret = aclnnIm2ColFunc(selfShape, outShape, selfHostData, kernelSizeData, dilationData, paddingData, strideData, outHostData);
+  GGML_UNUSED(ret);
 }

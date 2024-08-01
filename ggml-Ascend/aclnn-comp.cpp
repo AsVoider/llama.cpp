@@ -46,7 +46,7 @@ int aclnn_soft_max_func(void* selfDataAddr, void* outDataAddr,
 
 int aclnn_soft_max_func(void * dataAddr, void * maskAddr, float scale, void * outAddr,
     aclnn_shape_t & dataShape, aclnn_shape_t & maskShape, aclnn_shape_t & outShape,
-    aclDataType dataType, aclDataType maskType, aclDataType outType, aclrtStream & stream) {
+    aclDataType dataType, aclDataType maskType, aclDataType outType, ggml_backend_ascend_context & ctx) {
   auto ret(0);
 
   aclTensor * dataTensor(nullptr);
@@ -60,12 +60,13 @@ int aclnn_soft_max_func(void * dataAddr, void * maskAddr, float scale, void * ou
   CHECK_RET(ret == ACL_SUCCESS, return ret);
 
   aclTensor * biasTensor(nullptr);
-  void * biasAddr(nullptr);
   int64_t sz(dataShape[0] * dataShape[1] * dataShape[2] * dataShape[3]);
-  ret = aclrtMalloc(&biasAddr, sz * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
-  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ggml_ascend_pool_alloc<char> bias_allo(ctx.pool(), sz * sizeof(float));
+  // ret = aclrtMalloc(&biasAddr, sz * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
+  void * biasAddr(static_cast<void *>(bias_allo.get()));
   ret = aclrtMemset(biasAddr, sz * sizeof(float), 0, sz * sizeof(float));
   CHECK_RET(ret == ACL_SUCCESS, return ret);
+
   // std::vector<float> bias(sz, 0);
   aclnn_shape_t biasShape{dataShape[0], dataShape[1], dataShape[2], dataShape[3]};
   ret = create_acl_tensor(biasShape, outType, &biasAddr, &biasTensor);
@@ -113,14 +114,16 @@ int aclnn_soft_max_func(void * dataAddr, void * maskAddr, float scale, void * ou
 
   void* workspaceAddr = nullptr;
   if (workSpaceSize > 0) {
-    ret = aclrtMalloc(&workspaceAddr, workSpaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+    // ret = aclrtMalloc(&workspaceAddr, workSpaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+    ggml_ascend_pool_alloc<char> workspace_allocator(ctx.pool(), workSpaceSize);
+    workspaceAddr = static_cast<void *>(workspace_allocator.get());
   }
 
-  ret = aclnnMaskedSoftmaxWithRelPosBias(workspaceAddr, workSpaceSize, exe, stream);
+  ret = aclnnMaskedSoftmaxWithRelPosBias(workspaceAddr, workSpaceSize, exe, ctx.stream());
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMaskedSoftmaxWithRelPosBias failed. ERROR: %d\n", ret); return ret);
 
-  ret = aclrtSynchronizeStream(stream);
+  ret = aclrtSynchronizeStream(ctx.stream());
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
 
   aclDestroyTensor(dataTensor);
@@ -134,6 +137,7 @@ int acl_soft_max_func(void* selfDataAddr, void* outDataAddr, aclnn_shape_t& self
   aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
   aclrtStream &stream){
 
+  GGML_UNUSED(otherDataType);
   aclTensor* self = nullptr;
   aclTensor* out = nullptr;
   auto ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
@@ -169,8 +173,10 @@ int acl_soft_max_func(void* selfDataAddr, void* outDataAddr, aclnn_shape_t& self
 }
 
 
-int aclnnSoftMaxFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream ){
+int aclnnSoftMaxFunc(std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape, std::vector<float>& selfHostData, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream){
   // 2. 构造输入与输出，需要根据API的接口自定义构造
+
+  GGML_UNUSED(context);
   void* selfDeviceAddr = nullptr;
   void* outDeviceAddr = nullptr;
   aclTensor* self = nullptr;
@@ -232,6 +238,6 @@ void aclnnSoftMaxTest(){
   std::vector<int64_t> outShape = {4, 1 ,1, 2};
   std::vector<float> selfHostData = {0, 1, 2, 3, 4, 5, 6, 7};
   std::vector<float> outHostData = {0, 0, 0, 0, 0, 0, 0, 0};
-  float a[200];
+  // float a[200];
   //int ret = aclnnSoftMaxFunc(selfShape, outShape, selfHostData, outHostData, a);
 }

@@ -132,11 +132,11 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
         size_t size = 0;
     };
 
-    ggml_ascend_buffer buffer_pool[MAX_BUFFERS] = {};
+    ggml_ascend_buffer buffer_pool[MAX_BUFFERS] = { };
     size_t pool_size = 0;
 
     explicit ggml_ascend_pool_leg(int device) : device(device) {
-
+        printf("pool init\n");
     }
 
     ~ggml_ascend_pool_leg() {
@@ -148,25 +148,36 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
                 auto ret = aclrtFree(b.ptr);
                 CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl free failed at [~ggml_ascend_pool_leg]: %d\n", ret); return);
                 pool_size -= b.size;
+                // FILE *f = fopen("./mem.txt", "a+");
+                // fprintf(f, "now size is %ld, b[%d] size is %ld, ptr is %p\n", pool_size, i, b.size, b.ptr);
+                // fclose(f);
             }
-            GGML_ASSERT(pool_size == 0);
             // todo assert: fixed
         }
+        GGML_ASSERT(pool_size == 0);
     }
 
     void * alloc(size_t size, size_t * actual_size) override {
-        size_t best_diff = 1ull << 36;  // 2 * 36
-        int ibest = 1;
+        #ifdef DEBUG_CANN_MALLOC
+        int nnz = 0;
+        size_t max_size = 0;
+#endif
+        size_t best_diff = 1ull << 36;
+        int ibest = -1;
         for (int i = 0; i < MAX_BUFFERS; ++i) {
-            auto &b = buffer_pool[i];
+            ggml_ascend_buffer& b = buffer_pool[i];
             if (b.ptr != nullptr) {
+#ifdef DEBUG_CANN_MALLOC
+                ++nnz;
+                if (b.size > max_size) max_size = b.size;
+#endif
                 if (b.size >= size) {
-                    auto diff = b.size - size;
+                    size_t diff = b.size - size;
                     if (diff < best_diff) {
                         best_diff = diff;
                         ibest = i;
                         if (!best_diff) {
-                            void * ptr = b.ptr;
+                            void* ptr = b.ptr;
                             *actual_size = b.size;
                             b.ptr = nullptr;
                             b.size = 0;
@@ -177,36 +188,58 @@ struct ggml_ascend_pool_leg : public ggml_ascend_pool {
             }
         }
         if (ibest >= 0) {
-            auto &b = buffer_pool[ibest];
-            auto ptr = b.ptr;
+            ggml_ascend_buffer& b = buffer_pool[ibest];
+            void* ptr = b.ptr;
             *actual_size = b.size;
             b.ptr = nullptr;
             b.size = 0;
             return ptr;
         }
-        void * ptr;
-        auto look_ahead_size = (size_t) (1.05 * size);
+        void* ptr;
+        size_t look_ahead_size = (size_t)(1.05 * size);
         look_ahead_size = 256 * ((look_ahead_size + 255) / 256);
         ggml_ascend_set_device(device);
-        // todo Check: fixed
-        auto ret = ggml_ascend_device_malloc(&ptr, look_ahead_size, device);
-        CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl device malloc failed at [pool_leg malloc]: %d\n", ret); return nullptr);
+        aclrtMalloc(&ptr, look_ahead_size, ACL_MEM_MALLOC_HUGE_FIRST);
         *actual_size = look_ahead_size;
         pool_size += look_ahead_size;
+#ifdef DEBUG_CANN_MALLOC
+        GGML_CANN_LOG_INFO(
+            "%s[%d]: %d buffers, max_size = %u MB, pool_size = %u MB, "
+            "requested %u MB\n",
+            __func__, device, nnz, (uint32_t)(max_size / 1024 / 1024),
+            (uint32_t)(pool_size / 1024 / 1024),
+            (uint32_t)(size / 1024 / 1024));
+#endif
+        // FILE *f = fopen("./mem.txt", "a+");
+        // fprintf(f, "now size is %ld, look ahead is %ld, ptr is %p\n", pool_size, look_ahead_size, ptr);
+        // fclose(f);
         return ptr;
     }
 
     void free(void * ptr, size_t size) override {
-        for (int i = 0; i < MAX_BUFFERS; i++) {
-            auto &b = buffer_pool[i];
+        // FILE *f = fopen("./mem.txt", "a+");
+        // fprintf(f, "before free size is %ld, ptr is %p, size is %ld\n", pool_size, ptr, size);
+        
+        for (int i = 0; i < MAX_BUFFERS; ++i) {
+            ggml_ascend_buffer& b = buffer_pool[i];
             if (b.ptr == nullptr) {
                 b.ptr = ptr;
                 b.size = size;
+                // fprintf(f, "i is %d, ptr is %p, size is %ld\n", i, ptr, size);
+                // fclose(f);
                 return;
             }
         }
+        // for (int i = 0; i < MAX_BUFFERS; i++) {
+        //     auto &b = buffer_pool[i];
+        //     if (b.ptr == nullptr) {
+        //         b.ptr = ptr;
+        //         b.size = size;
+        //         return;
+        //     }
+        // }
         GGML_ASCEND_LOG_WARN("ASCEND buffer pool full, increase MAX_BUFFERS\n");
-        ggml_ascend_set_device(device);
+        // ggml_ascend_set_device(device);
         // todo Check: fixed
         auto ret = aclrtFree(ptr);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("acl free failed at [ggml_ascend_pool_leg free]: %d\n", ret); return);
@@ -234,7 +267,6 @@ struct ggml_backend_ascend_buffer_context {
 };
 
 std::unique_ptr<ggml_ascend_pool> ggml_backend_ascend_context::new_pool_for_device(int device) {
-    // todo if vmm?: fixed
     return std::unique_ptr<ggml_ascend_pool>(new ggml_ascend_pool_leg(device));
 }
 
@@ -754,7 +786,7 @@ static bool ggml_ascend_compute_forward(ggml_backend_ascend_context & ctx, struc
             //     fprintf(f, "%f ,", src0_vec[i]);
             // }
             // fprintf(f, "}\n");
-            ggml_ascend_rms_norm(ctx, dst);
+            ggml_ascend_rms_norm_new(ctx, dst);
             // fprintf(f, "dst data: {");
             // std::vector<float> dst_vec(src0_size, 0);
             // aclrtMemcpy(dst_vec.data(), dst_vec.size()* sizeof(dst_vec[0]), tensor->data,

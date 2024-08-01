@@ -6,6 +6,7 @@
 
 
 void aclnn_cpy_func_test(int64_t* ne, float* data, int32_t deviceId, aclrtStream stream){
+    GGML_UNUSED(deviceId);
 
     std::vector<int64_t> selfShape = {ne[3], ne[2], ne[1], ne[0]};
     std::vector<int64_t> otherShape = {ne[3], ne[2], ne[1], ne[0]};
@@ -13,10 +14,10 @@ void aclnn_cpy_func_test(int64_t* ne, float* data, int32_t deviceId, aclrtStream
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data, data + ne[0]*ne[1]*ne[2]*ne[3]);
     std::vector<float> otherHostData(ne[0]*ne[1]*ne[2]*ne[3], 0);
     std::vector<float> outHostData(ne[0]*ne[1]*ne[2]*ne[3], 0);

@@ -11,12 +11,22 @@ int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
     aclDataType selfRefDataType, aclDataType srcDataType,
     aclrtStream &stream, size_t *selfRef_nb = nullptr, size_t *src_nb = nullptr);
 
+int aclnn_cpy_func(void* selfRefDataAddr, void* srcDataAddr,
+    aclnn_shape_t& selfRefShape, aclnn_shape_t& srcShape,
+    aclDataType selfRefDataType, aclDataType srcDataType,
+    ggml_backend_ascend_context & ctx, size_t *selfRef_nb = nullptr, size_t *src_nb = nullptr);
+
 int aclnnCpyFunc(std::vector<int64_t>& selfRefShape, std::vector<int64_t>& srcShape, std::vector<float>& selfRefHostData, std::vector<float>& srcHostData,  float* dst, aclrtContext &context, aclrtStream &stream);
 
 int aclnn_get_rows_func(void* selfDataAddr, void* indexDataAddr, void* outDataAddr,
 	aclnn_shape_t& selfShape, aclnn_shape_t& indexShape, aclnn_shape_t& outShape,
 	aclDataType selfDataType, aclDataType indexDataType, aclDataType outDataType,
 	aclrtStream &stream);
+
+int aclnn_get_rows_func(void* selfDataAddr, void* indexDataAddr, void* outDataAddr,
+	aclnn_shape_t& selfShape, aclnn_shape_t& indexShape, aclnn_shape_t& outShape,
+	aclDataType selfDataType, aclDataType indexDataType, aclDataType outDataType,
+	ggml_backend_ascend_context & ctx);  
 
 int aclnnGetRowsFunc(std::vector<int64_t> &selfShape,
   std::vector<int64_t> &indexShape,

@@ -2,6 +2,7 @@
 #include <vector>
 #include "common.h"
 #include "acl/acl.h"
+#include "aclnn-repeat.h"
 #include "aclnnop/aclnn_repeat.h"
 
 int aclnn_repeat_func(void* selfDataAddr, void* outDataAddr,

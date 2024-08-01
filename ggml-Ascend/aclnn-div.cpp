@@ -98,4 +98,5 @@ void aclnnDivTest(){
   std::vector<float> otherHostData = {1, 1, 1, 2, 2, 2, 3, 3};
   std::vector<float> outHostData(8, 0);
   int ret = aclnnDivFunc(selfShape, otherShape, outShape, selfHostData, otherHostData, outHostData);
+  GGML_UNUSED(ret);
 }

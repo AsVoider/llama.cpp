@@ -18,6 +18,7 @@
 static aclTensor* aclnn_zero(ggml_backend_ascend_context & ctx, void* buffer,
                              size_t n_bytes, int64_t* ne, int64_t dims,
                              aclDataType type, size_t type_size) {
+    GGML_UNUSED(ctx);
     size_t nb[GGML_MAX_DIMS];
     nb[0] = type_size;
     for (int i = 1; i < dims; i++) {
@@ -48,12 +49,14 @@ static aclTensor* aclnn_ones(ggml_backend_ascend_context& ctx, void* buffer,
                                                &workspaceSize, &executor);
 
     if (workspaceSize > 0) {
-        aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        // aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        ggml_ascend_pool_alloc<char> workspace_allocator(ctx.pool(), workspaceSize);
+        workspaceAddr = static_cast<void *>(workspace_allocator.get());
     }
     aclnnInplaceAdds(workspaceAddr, workspaceSize, executor, ctx.stream());
 
     aclrtSynchronizeStream(ctx.stream());
-    aclrtFree(workspaceAddr);
+    // aclrtFree(workspaceAddr);
     return acl_tensor;
 }
 
@@ -61,7 +64,7 @@ static aclTensor* aclnn_ones(ggml_backend_ascend_context& ctx, void* buffer,
 void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ggml_tensor* src0 = dst->src[0];
     ggml_tensor* src1 = dst->src[1];
-    aclrtStream stream = ctx.stream();
+    // aclrtStream stream = ctx.stream();
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
@@ -102,7 +105,7 @@ void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     auto ret = aclnn_get_rows_func(src0->data, src1->data, dst->data,
                             selfShape, indexShape, outShape,
                             ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type],
-                            stream);
+                            ctx);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_get_rows failed. ERROR: %d\n", ret); return);
 
     // aclrtFree(offsetDeviceAddr);
@@ -112,7 +115,7 @@ void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 void ggml_ascend_add(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ggml_tensor* src0 = dst->src[0];
     ggml_tensor* src1 = dst->src[1];
-    aclrtStream stream = ctx.stream();
+    // aclrtStream stream = ctx.stream();
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
@@ -128,14 +131,14 @@ void ggml_ascend_add(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     int ret = aclnn_add_func(src0->data, src1->data, dst->data,
                             selfShape, otherShape, outShape,
                             ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type],
-                            stream);
+                            ctx);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_add failed. ERROR: %d\n", ret); return);
 }
 
 void ggml_ascend_mul(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ggml_tensor* src0 = dst->src[0];
     ggml_tensor* src1 = dst->src[1];
-    aclrtStream stream = ctx.stream();
+    // aclrtStream stream = ctx.stream();
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
@@ -151,12 +154,12 @@ void ggml_ascend_mul(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     int ret = aclnn_mul_func(src0->data, src1->data, dst->data,
                             selfShape, otherShape, outShape,
                             ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type],
-                            stream);
+                            ctx);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul failed. ERROR: %d\n", ret); return);
 }
 
 void ggml_ascend_cpy(ggml_backend_ascend_context &ctx, ggml_tensor *src, ggml_tensor *dst) {
-    aclrtStream stream = ctx.stream();
+    // aclrtStream stream = ctx.stream();
 
     aclnn_shape_t srcShape = {src->ne[3], src->ne[2], src->ne[1], src->ne[0]};
     aclnn_shape_t dstShape = {dst->ne[3], dst->ne[2], dst->ne[1], dst->ne[0]};
@@ -179,7 +182,7 @@ void ggml_ascend_cpy(ggml_backend_ascend_context &ctx, ggml_tensor *src, ggml_te
     int ret = aclnn_cpy_func(dst->data, src->data,
                             dstShape, srcShape,
                             ggml_to_acl_map[dst->type], ggml_to_acl_map[src->type],
-                            stream,
+                            ctx,
                             isSameShape ? dst->nb : nullptr, src->nb);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_cpy failed. ERROR: %d\n", ret); return);
 }
@@ -191,7 +194,7 @@ void ggml_ascend_dup(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
 void ggml_ascend_silu(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ggml_tensor* src = dst->src[0];
-    aclrtStream stream = ctx.stream();
+    // aclrtStream stream = ctx.stream();
 
     aclnn_shape_t srcShape = {src->ne[3], src->ne[2], src->ne[1], src->ne[0]};
     aclnn_shape_t dstShape = {dst->ne[3], dst->ne[2], dst->ne[1], dst->ne[0]};
@@ -199,7 +202,7 @@ void ggml_ascend_silu(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     int ret = aclnn_silu_func(src->data, dst->data,
                             srcShape, dstShape,
                             ggml_to_acl_map[src->type], ggml_to_acl_map[dst->type],
-                            stream);
+                            ctx);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_silu failed. ERROR: %d\n", ret); return);
 }
 
@@ -251,19 +254,18 @@ void ggml_ascend_rms_norm_new(ggml_backend_ascend_context & ctx, ggml_tensor * d
     void* workspaceAddr = nullptr;
 
     size_t one_tensor_n_bytes = src->ne[0] * ggml_element_size(src);
-    // ggml_cann_pool_alloc one_tensor_allocator(ctx.pool(), one_tensor_n_bytes);
-    void *one_ptr;
-    aclrtMalloc(&one_ptr, one_tensor_n_bytes, ACL_MEM_MALLOC_NORMAL_ONLY);
+    ggml_ascend_pool_alloc<char> one_tensor_allocator(ctx.pool(), one_tensor_n_bytes);
+    void *one_ptr(static_cast<void *>(one_tensor_allocator.get()));
+    // aclrtMalloc(&one_ptr, one_tensor_n_bytes, ACL_MEM_MALLOC_NORMAL_ONLY);
 
     aclTensor* acl_gamma = aclnn_ones(
         ctx, one_ptr, one_tensor_n_bytes, src->ne, 1,
         ggml_to_acl_map[src->type], ggml_element_size(src));
 
-    size_t zero_tensor_n_bytes =
-        src->ne[1] * src->ne[2] * src->ne[3] * ggml_element_size(src);
-    // ggml_cann_pool_alloc zero_tensor_allocator(ctx.pool(), zero_tensor_n_bytes);
-    void *zero_ptr;
-    aclrtMalloc(&zero_ptr, zero_tensor_n_bytes, ACL_MEM_MALLOC_NORMAL_ONLY);
+    size_t zero_tensor_n_bytes = src->ne[1] * src->ne[2] * src->ne[3] * ggml_element_size(src);
+    ggml_ascend_pool_alloc<char> zero_tensor_allocator(ctx.pool(), zero_tensor_n_bytes);
+    void *zero_ptr(static_cast<void *>(zero_tensor_allocator.get()));
+    // aclrtMalloc(&zero_ptr, zero_tensor_n_bytes, ACL_MEM_MALLOC_NORMAL_ONLY);
     aclTensor* acl_rstd =
         aclnn_zero(ctx, zero_ptr, zero_tensor_n_bytes,
                    src->ne, GGML_MAX_DIMS, ggml_to_acl_map[src->type],
@@ -273,7 +275,9 @@ void ggml_ascend_rms_norm_new(ggml_backend_ascend_context & ctx, ggml_tensor * d
         acl_src, acl_gamma, eps, acl_dst, acl_rstd, &workspaceSize, &executor);
 
     if (workspaceSize > 0) {
-        aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        // aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        ggml_ascend_pool_alloc<char> workspace_allocator(ctx.pool(), workspaceSize);
+        workspaceAddr = static_cast<void *>(workspace_allocator.get());
     }
 
     aclnnRmsNorm(workspaceAddr, workspaceSize, executor, ctx.stream());
@@ -282,14 +286,14 @@ void ggml_ascend_rms_norm_new(ggml_backend_ascend_context & ctx, ggml_tensor * d
     aclDestroyTensor(acl_dst);
     aclDestroyTensor(acl_gamma);
     aclDestroyTensor(acl_rstd);
-    aclrtFree(one_ptr);
-    aclrtFree(zero_ptr);
-    aclrtFree(workspaceAddr);
+    // aclrtFree(one_ptr);
+    // aclrtFree(zero_ptr);
+    // aclrtFree(workspaceAddr);
 }
 
 void ggml_ascend_soft_max_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
     auto src0 = dst->src[0], src1 = dst->src[1];
-    auto stream = ctx.stream();
+    // auto stream = ctx.stream();
 
     GGML_TENSOR_BINARY_OP_LOCALS
 
@@ -305,7 +309,7 @@ void ggml_ascend_soft_max_new(ggml_backend_ascend_context & ctx, ggml_tensor * d
     aclnn_shape_t outShape{ne3, ne2, ne1, ne0};
 
     auto ret = aclnn_soft_max_func(dataAddr, maskAddr, scale, outAddr, dataShape, maskShape, outShape, 
-    ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type], stream);
+    ggml_to_acl_map[src0->type], ggml_to_acl_map[src1->type], ggml_to_acl_map[dst->type], ctx);
 
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("%s failed. ERROR: %d\n", __func__, ret); return);
 }
@@ -515,12 +519,14 @@ static void aclnn_mat_mul(ggml_backend_ascend_context& ctx, aclTensor* acl_input
                                           &executor);
 
     if (workspaceSize > 0) {
-        aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        // aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+        ggml_ascend_pool_alloc<char> workspace_allocator(ctx.pool(), workspaceSize);
+        workspaceAddr = static_cast<void *>(workspace_allocator.get());
     }
 
     aclnnMatmul(workspaceAddr, workspaceSize, executor, ctx.stream());
     aclrtSynchronizeStream(ctx.stream());
-    aclrtFree(workspaceAddr);
+    // aclrtFree(workspaceAddr);
 }
 
 static void ggml_ascend_mul_mat_fn(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
@@ -622,10 +628,11 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     // for (int64_t i = 0; i < tmp_size; i++) {
     //     LOG_PRINT("result[%ld] is: %f\n", i, resultData[i]);
     // }
-
-    void* mulOtherDeviceAddr = nullptr;
-    ret = aclrtMalloc(&mulOtherDeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    ggml_ascend_pool_alloc<char> mul_other_alloc(ctx.pool(), size * sizeof(float));
+    void* mulOtherDeviceAddr(static_cast<void *>(mul_other_alloc.get()));
+    // ret = aclrtMalloc(&mulOtherDeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    
     // for (int i = 0; i < size; i += ne[0] / 2) {
     //     ret = aclrtMemcpy((void *)((float *)mulOtherDeviceAddr + i), ne[0] / 2 * sizeof(float), powOutDeviceAddr, ne[0] / 2 * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
     //     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
@@ -658,8 +665,10 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ret = data_addr_malloc(mulOutShape, mulOutHostData, &mulOutDeviceAddr);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
-    ret = aclrtMalloc(&mulSelfDeviceAddr, size * sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    // ret = aclrtMalloc(&mulSelfDeviceAddr, size * sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
+    ggml_ascend_pool_alloc<char> mulSelfDeviceAddr_alloc(ctx.pool(), size * sizeof(int32_t));
+    mulSelfDeviceAddr = static_cast<void *>(mulSelfDeviceAddr_alloc.get());
     // for (int i = 0; i < size; i += ne[2]) {
     //     ret = aclrtMemcpy((void *)((int32_t *)mulSelfDeviceAddr + i), ne[2] * sizeof(int32_t), pos, ne[2] * sizeof(int32_t), ACL_MEMCPY_DEVICE_TO_DEVICE);
     //     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
@@ -685,7 +694,7 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ret = aclnn_mul_func(mulSelfDeviceAddr, mulOtherDeviceAddr, mulOutDeviceAddr,
                         mulSelfShape, mulOtherShape, mulOutShape,
                         ACL_INT32, ACL_FLOAT, ACL_FLOAT,
-                        stream);
+                        ctx);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
     // LOG_PRINT("\nmulOut: \n");
@@ -827,8 +836,8 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
     aclrtFree(powExpDeviceAddr);
     aclrtFree(powOutDeviceAddr);
-    aclrtFree(mulOtherDeviceAddr);
-    aclrtFree(mulSelfDeviceAddr);
+    // aclrtFree(mulOtherDeviceAddr);
+    // aclrtFree(mulSelfDeviceAddr);
     aclrtFree(mulOutDeviceAddr);
     aclrtFree(mulsOutDeviceAddr);
     aclrtFree(sinOutDeviceAddr);

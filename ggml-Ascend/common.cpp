@@ -91,12 +91,15 @@ int Init(int32_t deviceId, aclrtContext* context, aclrtStream* stream) {
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclInit failed. ERROR: %d\n", ret); return ret);
   ret = aclrtSetDevice(deviceId);
   CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetDevice failed. ERROR: %d\n", ret); return ret);
+
+  GGML_UNUSED(context);
   // ret = aclrtCreateContext(context, deviceId);
   // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateContext failed. ERROR: %d\n", ret); return ret);
   // ret = aclrtSetCurrentContext(*context);
   // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSetCurrentContext failed. ERROR: %d\n", ret); return ret);
   // ret = aclrtCreateStream(stream);
   // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtCreateStream failed. ERROR: %d\n", ret); return ret);
+  ((void *)stream);
   return 0;
 }
 
@@ -104,7 +107,7 @@ int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** d
     // 计算连续tensor的strides
     std::vector<int64_t> strides(shape.size(), 1);
     if(nb) {
-        for (int64_t i = 0; i < shape.size(); i++) {
+        for (decltype(shape.size()) i = 0; i < shape.size(); i++) {
           strides[shape.size() - 1 - i] = nb[i] / aclDataTypeSize(dataType);
           // LOG_PRINT("strides[%ld] is: %ld\n", i, strides[i]);
         }

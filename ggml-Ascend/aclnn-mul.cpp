@@ -56,12 +56,60 @@ int aclnn_mul_func(void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
   return 0;
 }
 
+int aclnn_mul_func(void* selfDataAddr, void* otherDataAddr, void* outDataAddr,
+  aclnn_shape_t& selfShape, aclnn_shape_t& otherShape, aclnn_shape_t& outShape,
+  aclDataType selfDataType, aclDataType otherDataType, aclDataType outDataType,
+  ggml_backend_ascend_context & ctx) {
+
+  auto ret = 0;
+
+  aclTensor* self = nullptr;
+  aclTensor* other = nullptr;
+  aclTensor* out = nullptr;
+
+  ret = create_acl_tensor(selfShape, selfDataType, &selfDataAddr, &self);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(otherShape, otherDataType, &otherDataAddr, &other);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+  ret = create_acl_tensor(outShape, outDataType, &outDataAddr, &out);
+  CHECK_RET(ret == ACL_SUCCESS, return ret);
+
+  uint64_t workspaceSize = 0;
+  aclOpExecutor* executor;
+
+  ret = aclnnMulGetWorkspaceSize(self, other, out, &workspaceSize, &executor);
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMulGetWorkspaceSize failed. ERROR: %d\n", ret); return ret);
+  void* workspaceAddr = nullptr;
+  if (workspaceSize > 0) {
+    // ret = aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("allocate workspace failed. ERROR: %d\n", ret); return ret);
+    ggml_ascend_pool_alloc<char> workspace_allocator(ctx.pool(), workspaceSize);
+    workspaceAddr = static_cast<void *>(workspace_allocator.get());
+  }
+  ret = aclnnMul(workspaceAddr, workspaceSize, executor, ctx.stream());
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclnnMul failed. ERROR: %d\n", ret); return ret);
+
+  ret = aclrtSynchronizeStream(ctx.stream());
+  CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+  aclDestroyTensor(self);
+  aclDestroyTensor(other);
+  aclDestroyTensor(out);
+
+  // if (workspaceSize > 0) {
+  //   aclrtFree(workspaceAddr);
+  // }
+
+  return 0;
+}
+
 int aclnnMulFunc( std::vector<int64_t>& selfShape,
   std::vector<int64_t>& otherShape,
   std::vector<int64_t>& outShape,
   std::vector<float>& selfHostData,
   std::vector<float>& otherHostData,
   std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream){
+  GGML_UNUSED(context);
 
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* selfDeviceAddr = nullptr;
@@ -170,7 +218,7 @@ int aclnn_muls_func(void* selfDataAddr, void* outDataAddr,
 }
 
 int aclnnMulsFunc(std::vector<float>& selfHostData, std::vector<float>& outHostData, float otherValue, std::vector<int64_t>& selfShape, std::vector<int64_t>& outShape ,float* dst, aclrtContext &context, aclrtStream &stream){
-
+  GGML_UNUSED(context);
 
   for(int i=0; i<16; i++){
     std::cout<<selfHostData[i]<<" ";
@@ -285,6 +333,7 @@ int aclnn_mul_mat_func(void* selfDataAddr, void* mat2DataAddr, void* outDataAddr
 }
 
 int aclnnMulMatFunc(std::vector<float>& selfHostData, std::vector<float>& mat2HostData, std::vector<int64_t>& selfShape, std::vector<int64_t>& mat2Shape,std::vector<int64_t>& outShape, std::vector<float>& outHostData, float* dst, aclrtContext &context, aclrtStream &stream){
+  GGML_UNUSED(context);
 
   // 2. 构造输入与输出，需要根据API的接口自定义构造
 
@@ -404,7 +453,7 @@ void aclnnMulTest(){
   std::vector<float> selfHostData = {0, 1, 2, 3, 4, 5, 6, 7};
   std::vector<float> otherHostData = {1, 1, 1, 2, 2, 2, 3, 3};
   std::vector<float> outHostData(8, 0);
-  float *a ;
+  // float *a ;
   //int ret = aclnnMulFunc(selfShape, otherShape, outShape, selfHostData, otherHostData, outHostData,a);
 }
 
@@ -412,9 +461,10 @@ void aclnnMulTest(){
 void aclnnMulsTest(){
   std::vector<float> selfHostData = {0, 1, 2, 3, 4, 5, 6, 7};
   float alphaValue = 1.2f;
+  GGML_UNUSED(alphaValue);
   int len = 2;
   int width = 4;
-  float dstTestp[len*width];
+  // float dstTestp[len*width];
   std::vector<int64_t> selfShape = {len, width};
   std::vector<int64_t> outShape = {len, width};
   std::vector<float> outHostData(len* width, 0);

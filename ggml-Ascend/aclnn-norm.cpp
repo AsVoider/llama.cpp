@@ -274,6 +274,8 @@ int aclnnRmsNormFunc( std::vector<int64_t>& xShape,
   std::vector<float>& rstdHostData,
   float epsilon, float* dst, aclrtContext &context, aclrtStream &stream){
 
+  GGML_UNUSED(context);
+
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* xDeviceAddr = nullptr;
   void* gammaDeviceAddr = nullptr;
@@ -357,7 +359,7 @@ void aclnnNormTest(){
     float pValue = 2.0f;
     bool keepDim = true;
     int ret = aclnnNormFunc(selfHostData, outHostData, dimData, pValue, keepDim, selfShape, outShape);
-
+    GGML_UNUSED(ret);
 }
 
 void aclnnGroupNormTest(){
@@ -382,7 +384,7 @@ void aclnnGroupNormTest(){
     double eps = 1e-5;
     int ret = aclnnGroupNormFunc(selfShape, gammaShape, betaShape, outShape, meanOutShape, rstdOutShape, selfHostData, gammaHostData, betaHostData, outHostData, meanOutHostData, rstdOutHostData,
         N, C, HxW, group, eps);
-
+    GGML_UNUSED(ret);
 }
 
 void aclnnRmsNormTest(){
@@ -394,6 +396,6 @@ void aclnnRmsNormTest(){
   std::vector<float> gammaHostData = {1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1};
   std::vector<float> yHostData(xHostData.size(), 0);
   std::vector<float> rstdHostData = {1, 16};
-  float epsilon = 1;
+  // float epsilon = 1;
   //int ret = aclnnRmsNormFunc(xShape, gammaShape, yShape, rstdShape, xHostData, gammaHostData, yHostData, rstdHostData, epsilon);
 }

@@ -54,6 +54,7 @@ template int aclnn_pow_scalar_tensor_func<float>(float, void*, void*, aclnn_shap
 
 int aclnnPowScalarTensorFunc(std::vector<int64_t>& exponentShape, std::vector<int64_t> &outShape,
   std::vector<float> &exponentHostData, std::vector<float>& outHostData, float selfValue, float* dst ,aclrtContext &context, aclrtStream &stream){
+  GGML_UNUSED(context);
 
   // 2. 构造输入与输出，需要根据API的接口自定义构造
   void* exponentDeviceAddr = nullptr;
@@ -159,6 +160,7 @@ int aclnnSinFunc( std::vector<int64_t> &selfShape,
   std::vector<int64_t> &outShape,
   std::vector<float> &selfHostData,
   std::vector<float> &outHostData, float* dst ,aclrtContext &context, aclrtStream &stream){
+  GGML_UNUSED(context);
 
   LOG_PRINT("test aclnnSin\n");
   void* selfDeviceAddr = nullptr;
@@ -260,6 +262,7 @@ int aclnnCosFunc( std::vector<int64_t> &selfShape,
   std::vector<int64_t> &outShape,
   std::vector<float> &selfHostData,
   std::vector<float> &outHostData, float* dst ,aclrtContext &context, aclrtStream &stream){
+  GGML_UNUSED(context);
 
   void* selfDeviceAddr = nullptr;
   void* outDeviceAddr = nullptr;

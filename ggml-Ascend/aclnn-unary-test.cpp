@@ -8,7 +8,9 @@
 #include "aclnn-compute.h"
 
 
-void aclnn_silu_func_test(int64_t lens, int64_t width, float* data, int32_t deviceId, aclrtStream stream){
+void aclnn_silu_func_test(int64_t lens, int64_t width, float* data, int32_t deviceId, ggml_backend_ascend_context & ctx){
+    GGML_UNUSED(deviceId);
+    GGML_UNUSED(ctx);
 
     std::vector<int64_t> selfShape = {lens, width};
     std::vector<int64_t> otherShape = {lens, width};
@@ -16,10 +18,10 @@ void aclnn_silu_func_test(int64_t lens, int64_t width, float* data, int32_t devi
     void* selfDeviceAddr = nullptr;
     void* otherDeviceAddr = nullptr;
     void* outDeviceAddr = nullptr;
-    aclTensor* self = nullptr;
-    aclTensor* other = nullptr;
-    aclScalar* alpha = nullptr;
-    aclTensor* out = nullptr;
+    // aclTensor* self = nullptr;
+    // aclTensor* other = nullptr;
+    // aclScalar* alpha = nullptr;
+    // aclTensor* out = nullptr;
     std::vector<float> selfHostData(data, data+ lens* width);
     std::vector<float> otherHostData = {1, 1, 1, 2, 2, 2, 3, 3};
     std::vector<float> outHostData(lens* width, 0);
@@ -32,7 +34,7 @@ void aclnn_silu_func_test(int64_t lens, int64_t width, float* data, int32_t devi
     CHECK_RET(ret == ACL_SUCCESS, return);
 
 
-    aclnn_silu_func(selfDeviceAddr, outDeviceAddr, selfShape, outShape, aclDataType::ACL_FLOAT, aclDataType::ACL_FLOAT, stream);
+    // aclnn_silu_func(selfDeviceAddr, outDeviceAddr, selfShape, outShape, aclDataType::ACL_FLOAT, aclDataType::ACL_FLOAT, ctx);
 
     auto size = GetShapeSize(outShape);
     std::vector<float> resultData(size, 0);

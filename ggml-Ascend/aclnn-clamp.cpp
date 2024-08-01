@@ -97,4 +97,5 @@ void aclnnClampTest(){
     std::vector<float> outHostData = {0, 0, 0, 0, 0, 0, 0, 0};
 
     int ret = aclnnClampFunc(shape, selfHostData, outHostData, max_v, min_v);
+    GGML_UNUSED(ret);
 }
