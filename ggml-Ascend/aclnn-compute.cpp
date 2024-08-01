@@ -15,6 +15,49 @@
 #include <cmath>
 #include <algorithm>
 
+static aclTensor* aclnn_zero(ggml_backend_ascend_context & ctx, void* buffer,
+                             size_t n_bytes, int64_t* ne, int64_t dims,
+                             aclDataType type, size_t type_size) {
+    size_t nb[GGML_MAX_DIMS];
+    nb[0] = type_size;
+    for (int i = 1; i < dims; i++) {
+        nb[i] = nb[i - 1] * ne[i - 1];
+    }
+
+    aclrtMemset(buffer, n_bytes, 0, n_bytes);
+    aclTensor* zero =
+        ggml_ascend_create_tensor(buffer, type, type_size, ne, nb, dims);
+    return zero;
+}
+
+static aclTensor* aclnn_ones(ggml_backend_ascend_context& ctx, void* buffer,
+                             size_t n_bytes, int64_t* ne, int64_t dims,
+                             aclDataType type, size_t type_size,
+                             float value = 1.0f) {
+    aclTensor* acl_tensor =
+        aclnn_zero(ctx, buffer, n_bytes, ne, dims, type, type_size);
+    float alpha_host = 1.0f;
+    aclScalar* alpha = aclCreateScalar(&alpha_host, aclDataType::ACL_FLOAT);
+    aclScalar* other = aclCreateScalar(&value, aclDataType::ACL_FLOAT);
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
+
+    aclnnInplaceAddsGetWorkspaceSize(acl_tensor, other, alpha,
+                                               &workspaceSize, &executor);
+
+    if (workspaceSize > 0) {
+        aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    }
+    aclnnInplaceAdds(workspaceAddr, workspaceSize, executor, ctx.stream());
+
+    aclrtSynchronizeStream(ctx.stream());
+    aclrtFree(workspaceAddr);
+    return acl_tensor;
+}
+
+
 void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     ggml_tensor* src0 = dst->src[0];
     ggml_tensor* src1 = dst->src[1];
@@ -117,7 +160,9 @@ void ggml_ascend_cpy(ggml_backend_ascend_context &ctx, ggml_tensor *src, ggml_te
 
     aclnn_shape_t srcShape = {src->ne[3], src->ne[2], src->ne[1], src->ne[0]};
     aclnn_shape_t dstShape = {dst->ne[3], dst->ne[2], dst->ne[1], dst->ne[0]};
-    srcShape = dstShape;
+    // srcShape = dstShape;
+    bool isSameShape = ggml_are_same_shape(src, dst);
+    dstShape = srcShape;
 
     // std::cout<<"in ggml_ascend_cpy :"<<std::endl;
     // std::cout<<"src shape: "<<src->ne[3]<<" "<<src->ne[2]<<" "<<src->ne[1]<<" "<<src->ne[0]<<std::endl;
@@ -135,7 +180,7 @@ void ggml_ascend_cpy(ggml_backend_ascend_context &ctx, ggml_tensor *src, ggml_te
                             dstShape, srcShape,
                             ggml_to_acl_map[dst->type], ggml_to_acl_map[src->type],
                             stream,
-                            dst->nb, src->nb);
+                            isSameShape ? dst->nb : nullptr, src->nb);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_cpy failed. ERROR: %d\n", ret); return);
 }
 
@@ -188,6 +233,58 @@ void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
 
     aclrtFree(gammaDeviceAddr);
     aclrtFree(rstdDeviceAddr);
+}
+
+void ggml_ascend_rms_norm_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
+    auto src(dst->src[0]);
+
+    aclTensor* acl_src = ggml_ascend_create_tensor(src);
+    aclTensor* acl_dst = ggml_ascend_create_tensor(dst);
+
+    float eps;
+    memcpy(&eps, dst->op_params, sizeof(float));
+
+    GGML_ASSERT(eps > 0.0f);
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
+
+    size_t one_tensor_n_bytes = src->ne[0] * ggml_element_size(src);
+    // ggml_cann_pool_alloc one_tensor_allocator(ctx.pool(), one_tensor_n_bytes);
+    void *one_ptr;
+    aclrtMalloc(&one_ptr, one_tensor_n_bytes, ACL_MEM_MALLOC_NORMAL_ONLY);
+
+    aclTensor* acl_gamma = aclnn_ones(
+        ctx, one_ptr, one_tensor_n_bytes, src->ne, 1,
+        ggml_to_acl_map[src->type], ggml_element_size(src));
+
+    size_t zero_tensor_n_bytes =
+        src->ne[1] * src->ne[2] * src->ne[3] * ggml_element_size(src);
+    // ggml_cann_pool_alloc zero_tensor_allocator(ctx.pool(), zero_tensor_n_bytes);
+    void *zero_ptr;
+    aclrtMalloc(&zero_ptr, zero_tensor_n_bytes, ACL_MEM_MALLOC_NORMAL_ONLY);
+    aclTensor* acl_rstd =
+        aclnn_zero(ctx, zero_ptr, zero_tensor_n_bytes,
+                   src->ne, GGML_MAX_DIMS, ggml_to_acl_map[src->type],
+                   ggml_element_size(src));
+
+    aclnnRmsNormGetWorkspaceSize(
+        acl_src, acl_gamma, eps, acl_dst, acl_rstd, &workspaceSize, &executor);
+
+    if (workspaceSize > 0) {
+        aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    }
+
+    aclnnRmsNorm(workspaceAddr, workspaceSize, executor, ctx.stream());
+
+    aclDestroyTensor(acl_src);
+    aclDestroyTensor(acl_dst);
+    aclDestroyTensor(acl_gamma);
+    aclDestroyTensor(acl_rstd);
+    aclrtFree(one_ptr);
+    aclrtFree(zero_ptr);
+    aclrtFree(workspaceAddr);
 }
 
 void ggml_ascend_soft_max_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
@@ -402,6 +499,69 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
     aclrtFree(permuteOutDeviceAddr);
     aclrtFree(cpySelfRefDeviceAddr);
     aclrtFree(boardcastSrc0DeviceAddr);
+}
+
+static void aclnn_mat_mul(ggml_backend_ascend_context& ctx, aclTensor* acl_input,
+                          aclTensor* acl_weight, aclTensor* acl_dst) {
+    int8_t cube_math_type = 1;  // ALLOW_FP32_DOWN_PRECISION, when input is
+                                // fp32, atlas a2 will transpose it to HFLOAT32.
+
+    uint64_t workspaceSize = 0;
+    aclOpExecutor* executor;
+    void* workspaceAddr = nullptr;
+
+    aclnnMatmulGetWorkspaceSize(acl_input, acl_weight, acl_dst,
+                                          cube_math_type, &workspaceSize,
+                                          &executor);
+
+    if (workspaceSize > 0) {
+        aclrtMalloc(&workspaceAddr, workspaceSize, ACL_MEM_MALLOC_HUGE_FIRST);
+    }
+
+    aclnnMatmul(workspaceAddr, workspaceSize, executor, ctx.stream());
+    aclrtSynchronizeStream(ctx.stream());
+    aclrtFree(workspaceAddr);
+}
+
+static void ggml_ascend_mul_mat_fn(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
+    ggml_tensor* weight = dst->src[0];  // weight
+    ggml_tensor* input = dst->src[1];   // input
+
+    // when weight ne2 or ne3 is 1, aclnnMatmulGetWorkspaceSize will auto
+    // broadcast, when weight ne2 or ne3 is not 1, weight need repeat.
+    BCAST_MUL_MAT_SHAPE(input, weight, dst);
+
+    // transpose weight: [1,2,3,4] -> [1,2,4,3]
+    int64_t transpose_ne[] = {bcast_weight_ne[1], bcast_weight_ne[0],
+                              bcast_weight_ne[2], bcast_weight_ne[3],
+                              bcast_weight_ne[4], bcast_weight_ne[5]};
+    size_t transpose_nb[] = {bcast_weight_nb[1], bcast_weight_nb[0],
+                             bcast_weight_nb[2], bcast_weight_nb[3],
+                             bcast_weight_nb[4], bcast_weight_nb[5]};
+
+    aclTensor* acl_weight_tensor =
+        ggml_ascend_create_tensor(weight, transpose_ne, transpose_nb, bcast_dims);
+    aclTensor* acl_input_tensor =
+        ggml_ascend_create_tensor(input, BCAST_MUL_MAT_PARAM(input));
+    aclTensor* acl_dst = ggml_ascend_create_tensor(dst, BCAST_MUL_MAT_PARAM(dst));
+    aclnn_mat_mul(ctx, acl_input_tensor, acl_weight_tensor, acl_dst);
+
+    aclDestroyTensor(acl_weight_tensor);
+    aclDestroyTensor(acl_input_tensor);
+    aclDestroyTensor(acl_dst);
+}
+
+void ggml_ascend_mul_mat_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
+    const enum ggml_type type = dst->src[0]->type;
+    switch (type)
+    {
+    case GGML_TYPE_F32:
+    case GGML_TYPE_F16:
+        ggml_ascend_mul_mat_fn(ctx, dst);
+        break;
+    default:
+        break;
+    }
 }
 
 void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {

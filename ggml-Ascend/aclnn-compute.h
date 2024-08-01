@@ -9,6 +9,8 @@
 #include <stdio.h>
 #include "ggml.h"
 #include "common.h"
+#include <aclnnop/aclnn_matmul.h>
+#include <aclnnop/aclnn_rms_norm.h>
 
 void ggml_ascend_get_rows(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
 
@@ -24,6 +26,8 @@ void ggml_ascend_silu(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
 
 void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
 
+void ggml_ascend_rms_norm_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst);
+
 void ggml_ascend_soft_max(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
 
 void ggml_ascend_soft_max_new(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
@@ -31,6 +35,8 @@ void ggml_ascend_soft_max_new(ggml_backend_ascend_context &ctx, ggml_tensor *dst
 void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst);
 
 void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, ggml_tensor *src1, ggml_tensor *dst);
+
+void ggml_ascend_mul_mat_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst);
 
 void ggml_ascend_silu_test(int64_t lens, int64_t width, float* data, int32_t deviceId, aclrtStream stream);
 

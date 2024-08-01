@@ -6,6 +6,8 @@
 #ifndef COMMON_H
 #define COMMON_H
 
+#include <algorithm>
+#include <cstring>
 #include <iostream>
 #include <vector>
 #include <memory>
@@ -28,6 +30,44 @@ printf(message, ##__VA_ARGS__); \
 } while (0)
 
 #define GGML_ASCEND_MAX_STREAMS 8
+
+int64_t ggml_cann_get_bcast_shape(const ggml_tensor* src0, const ggml_tensor* src1,
+                        int64_t* bcast_ne_src0, int64_t* bcast_ne_src1,
+                        size_t* bcast_nb_src0, size_t* bcast_nb_src1);
+
+// Bcast macro to avoid duplicate code.
+#define BCAST_SHAPE(src0, src1)                                              \
+    int64_t bcast_##src0##_ne[GGML_MAX_DIMS * 2];                            \
+    int64_t bcast_##src1##_ne[GGML_MAX_DIMS * 2];                            \
+    size_t bcast_##src0##_nb[GGML_MAX_DIMS * 2];                             \
+    size_t bcast_##src1##_nb[GGML_MAX_DIMS * 2];                             \
+    int64_t bcast_dims = ggml_cann_get_bcast_shape(                          \
+        src0, src1, bcast_##src0##_ne, bcast_##src1##_ne, bcast_##src0##_nb, \
+        bcast_##src1##_nb);
+
+#define BCAST_PARAM(tensor) bcast_##tensor##_ne, bcast_##tensor##_nb, bcast_dims
+
+int64_t ggml_cann_get_mulmat_bcast_shape(
+    const int64_t* input_ne, const int64_t* weight_ne, const int64_t* dst_ne,
+    const size_t* input_nb, const size_t* weight_nb, const size_t* dst_nb,
+    int64_t* bcast_input_ne, int64_t* bcast_weight_ne, int64_t* bcast_dst_ne,
+    size_t* bcast_input_nb, size_t* bcast_weight_nb, size_t* bcast_dst_nb);
+
+// Bcast macro to avoid duplicate code.
+#define BCAST_MUL_MAT_SHAPE(input, weight, dst)                         \
+    int64_t bcast_##input##_ne[GGML_MAX_DIMS * 2];                      \
+    int64_t bcast_##weight##_ne[GGML_MAX_DIMS * 2];                     \
+    int64_t bcast_##dst##_ne[GGML_MAX_DIMS * 2];                        \
+    size_t bcast_##input##_nb[GGML_MAX_DIMS * 2];                       \
+    size_t bcast_##weight##_nb[GGML_MAX_DIMS * 2];                      \
+    size_t bcast_##dst##_nb[GGML_MAX_DIMS * 2];                         \
+    int64_t bcast_dims = ggml_cann_get_mulmat_bcast_shape(              \
+        input->ne, weight->ne, dst->ne, input->nb, weight->nb, dst->nb, \
+        bcast_##input##_ne, bcast_##weight##_ne, bcast_##dst##_ne,      \
+        bcast_##input##_nb, bcast_##weight##_nb, bcast_##dst##_nb);
+
+#define BCAST_MUL_MAT_PARAM(tensor) \
+    bcast_##tensor##_ne, bcast_##tensor##_nb, bcast_dims
 
 [[noreturn]]
 void ggml_ascend_error(const char * stmt, const char * func, const char * file, int line, const char * msg);
@@ -70,6 +110,15 @@ int CreateAclTensor(const std::vector<T>& hostData, const std::vector<int64_t>& 
 }
 
 int create_acl_tensor(const aclnn_shape_t& shape, aclDataType dataType, void** deviceAddr, aclTensor** tensor, size_t *nb = nullptr);
+aclTensor * ggml_ascend_create_tensor(const ggml_tensor * tensor, 
+                             int64_t * ne = nullptr, size_t* nb = nullptr, int64_t dims = 0,
+                             aclFormat format = ACL_FORMAT_ND,
+                             size_t offset = 0);
+aclTensor* ggml_ascend_create_tensor(void* data_ptr, aclDataType dtype,
+                             size_t type_size, int64_t* ne, size_t* nb,
+                             int64_t dims, aclFormat format = ACL_FORMAT_ND,
+                             size_t offset = 0);
+
 
 void ggml_ascend_set_device(int device);
 int ggml_ascend_get_device();
