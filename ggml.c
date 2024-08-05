@@ -4,7 +4,7 @@
 #include "ggml-impl.h"
 #include "ggml-quants.h"
 #include "ggml.h"
-
+#include "acl/acl_base.h"
 
 #if defined(_MSC_VER) || defined(__MINGW32__)
 #include <malloc.h> // using malloc.h with MSC/MINGW
@@ -3289,7 +3289,7 @@ bool ggml_are_same_stride(const struct ggml_tensor * t0, const struct ggml_tenso
 }
 
 // check if t1 can be represented as a repeatition of t0
-static inline bool ggml_can_repeat(const struct ggml_tensor * t0, const struct ggml_tensor * t1) {
+bool ggml_can_repeat(const struct ggml_tensor * t0, const struct ggml_tensor * t1) {
     static_assert(GGML_MAX_DIMS == 4, "GGML_MAX_DIMS is not 4 - update this function");
 
     return ggml_is_empty(t0) ? ggml_is_empty(t1) :
@@ -5996,7 +5996,7 @@ struct ggml_tensor * ggml_get_rows(
     return result;
 }
 
-// ggml_get_rows_back
+// ggml_get_rows_back   
 
 struct ggml_tensor * ggml_get_rows_back(
         struct ggml_context * ctx,
@@ -8482,6 +8482,8 @@ static void ggml_compute_forward_dup_f32(
     const int ith = params->ith; // thread index
     const int nth = params->nth; // number of threads
 
+    FILE *f = fopen("cpy_detail.txt", "a");
+
     if (ggml_is_contiguous(src0) && ggml_is_contiguous(dst) && src0->type == dst->type) {
         ggml_compute_forward_dup_same_cont(params, dst);
         return;
@@ -8499,6 +8501,7 @@ static void ggml_compute_forward_dup_f32(
         ne00 == ne0 &&
         nb00 == ggml_type_size(src0->type) && nb0 == ggml_type_size(dst->type)) {
         // copy by rows
+        fprintf(f, "0 ");
         const size_t rs = ne00*nb00;
         for (int64_t i03 = 0; i03 < ne03; i03++) {
             for (int64_t i02 = 0; i02 < ne02; i02++) {
@@ -8515,8 +8518,11 @@ static void ggml_compute_forward_dup_f32(
 
     if (ggml_is_contiguous(dst)) {
         // TODO: simplify
+        fprintf(f, "1 ");
         if (nb00 == sizeof(float)) {
+            fprintf(f, "10 ");
             if (dst->type == GGML_TYPE_F32) {
+                fprintf(f, "100 ");
                 size_t id = 0;
                 const size_t rs = ne00 * nb00;
                 char * dst_ptr = (char *) dst->data;
@@ -8533,6 +8539,7 @@ static void ggml_compute_forward_dup_f32(
                     }
                 }
             } else if (type_traits[dst->type].from_float) {
+                fprintf(f, "101 ");
                 ggml_from_float_t const quantize_row_q = type_traits[dst->type].from_float;
 
                 size_t id = 0;
@@ -8555,8 +8562,9 @@ static void ggml_compute_forward_dup_f32(
             }
         } else {
             //printf("%s: this is not optimal - fix me\n", __func__);
-
+            fprintf(f, "11 ");
             if (dst->type == GGML_TYPE_F32) {
+                fprintf(f, "110 ");
                 size_t id = 0;
                 float * dst_ptr = (float *) dst->data;
 
@@ -8575,6 +8583,7 @@ static void ggml_compute_forward_dup_f32(
                     }
                 }
             } else if (dst->type == GGML_TYPE_F16) {
+                fprintf(f, "111 ");
                 size_t id = 0;
                 ggml_fp16_t * dst_ptr = (ggml_fp16_t *) dst->data;
 
@@ -8593,6 +8602,7 @@ static void ggml_compute_forward_dup_f32(
                     }
                 }
             } else if (dst->type == GGML_TYPE_BF16) {
+                fprintf(f, "112 ");
                 size_t id = 0;
                 ggml_bf16_t * dst_ptr = (ggml_bf16_t *) dst->data;
 
@@ -8614,7 +8624,8 @@ static void ggml_compute_forward_dup_f32(
                 GGML_ASSERT(false); // TODO: implement
             }
         }
-
+        fprintf(f, "\n");
+        fclose(f);
         return;
     }
 
@@ -8626,6 +8637,7 @@ static void ggml_compute_forward_dup_f32(
     int64_t i13 = 0;
 
     if (dst->type == GGML_TYPE_F32) {
+        fprintf(f, "2 ");
         for (int64_t i03 = 0; i03 < ne03; i03++) {
             for (int64_t i02 = 0; i02 < ne02; i02++) {
                 i10 += ne00 * ir0;
@@ -8678,6 +8690,7 @@ static void ggml_compute_forward_dup_f32(
             }
         }
     } else if (dst->type == GGML_TYPE_F16) {
+        fprintf(f, "3: ");
         for (int64_t i03 = 0; i03 < ne03; i03++) {
             for (int64_t i02 = 0; i02 < ne02; i02++) {
                 i10 += ne00 * ir0;
@@ -8697,7 +8710,10 @@ static void ggml_compute_forward_dup_f32(
                     for (int64_t i00 = 0; i00 < ne00; i00++) {
                         const char * src0_ptr = ((char *) src0->data + i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03);
                               char * dst_ptr  = ((char *)  dst->data + i10*nb0  + i11*nb1  + i12*nb2  + i13*nb3);
-
+                        int64_t src0_s = i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03;
+                        int64_t dst_s = i10*nb0  + i11*nb1  + i12*nb2  + i13*nb3;
+                        fprintf(f, "src0 loc %ld,", src0_s);
+                        fprintf(f, "dst loc %ld;", dst_s);
                         *(ggml_fp16_t *) dst_ptr = GGML_FP32_TO_FP16(*(const float *) src0_ptr);
 
                         if (++i10 == ne0) {
@@ -8730,6 +8746,7 @@ static void ggml_compute_forward_dup_f32(
             }
         }
     } else if (dst->type == GGML_TYPE_BF16) {
+        fprintf(f, "4 ");
         for (int64_t i03 = 0; i03 < ne03; i03++) {
             for (int64_t i02 = 0; i02 < ne02; i02++) {
                 i10 += ne00 * ir0;
@@ -8784,6 +8801,8 @@ static void ggml_compute_forward_dup_f32(
     } else {
         GGML_ASSERT(false); // TODO: implement
     }
+    fprintf(f, "\n");
+    fclose(f);
 }
 
 // A simplified version of ggml_compute_forward_dup that doesn't do float upcasting, and just plain old memcpy.
@@ -16501,7 +16520,37 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_ADD:
             {
+                // FILE *f = fopen("add_cpu_new.txt", "a");
+                // struct ggml_tensor* src0 =tensor->src[0];
+                // struct ggml_tensor* src1 =tensor->src[1];
+                // fprintf(f, "src0 name: %s\n", src0->name);
+                // fprintf(f, "src1 name: %s\n", src1->name);
+                // fprintf(f, "dst name: %s\n", tensor->name);
+                // fprintf(f, "src0 type: %d\n", src0->type);
+                // fprintf(f, "src1 type: %d\n", src1->type);
+                // fprintf(f, "dst type: %d\n", tensor->type);
+                // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                // fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+                // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+                // fprintf(f, "src0 data: {");
+                // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)src0->data)[i]);
+                // }
+                // fprintf(f, "}\n \n");  
+                // fprintf(f, "src1 data: {");
+                // for(int i=0 ;i< src1->ne[0]* src1->ne[1]* src1->ne[2]* src1->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)src1->data)[i]);
+                // }
+                // fprintf(f, "}\n \n");  
+
                 ggml_compute_forward_add(params, tensor);
+// 
+//                 fprintf(f, "dst data: {");
+//                 for(int i=0 ;i< src1->ne[0]* src1->ne[1]* src1->ne[2]* src1->ne[3]; i++){
+//                     fprintf(f, "%f ,", ((float*)tensor->data)[i]);
+//                 }
+//                 fprintf(f, "}\n \n");  
+//                 fclose(f);
             } break;
         case GGML_OP_ADD1:
             {
@@ -16517,7 +16566,32 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_MUL:
             {
+                // FILE *f = fopen("mul_src.txt", "a");
+                // struct ggml_tensor* src0 =tensor->src[0];
+                // struct ggml_tensor* src1 =tensor->src[1];
+                // fprintf(f, "src0 type: %d\n", src0->type);
+                // fprintf(f, "src1 type: %d\n", src1->type);
+                // fprintf(f, "dst type: %d\n", tensor->type);
+                // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                // fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+                // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+                // fprintf(f, "src0 data: {");
+                // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)src0->data)[i]);
+                // }
+                // fprintf(f, "}\n \n");  
+                // fprintf(f, "src1 data: {");
+                // for(int i=0 ;i< src1->ne[0]* src1->ne[1]* src1->ne[2]* src1->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)src1->data)[i]);
+                // }
+                // fprintf(f, "}\n \n");  
                 ggml_compute_forward_mul(params, tensor);
+                // fprintf(f, "dst data: {");
+                // for(int i=0 ;i< src1->ne[0]* src1->ne[1]* src1->ne[2]* src1->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)tensor->data)[i]);
+                // }
+                // fprintf(f, "}\n \n");  
+                // fclose(f);
             } break;
         case GGML_OP_DIV:
             {
@@ -16573,7 +16647,29 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_RMS_NORM:
             {
+                // float eps;
+                // memcpy(&eps, (float*)tensor->op_params+0, sizeof(float));
+                // FILE *f = fopen("rms_src.txt", "a");
+                // fprintf(f, "eps data : %f\n", eps);
+                // struct ggml_tensor* src0 =tensor->src[0];
+                // fprintf(f, "src0 type: %d\n", src0->type);
+                // fprintf(f, "dst type: %d\n", tensor->type);
+                // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);    
+                // fprintf(f, "src0 data: {");
+                // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)src0->data)[i]);
+                // }
+                // fprintf(f, "}\n");
+
                 ggml_compute_forward_rms_norm(params, tensor);
+                // fprintf(f, "dst data: {");
+                // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)tensor->data)[i]);
+                // }
+                // fprintf(f, "}\n");
+                // fclose(f);
+
             } break;
         case GGML_OP_RMS_NORM_BACK:
             {
@@ -16586,6 +16682,38 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_MUL_MAT:
             {
                 ggml_compute_forward_mul_mat(params, tensor);
+                // if(strncmp(tensor->name, "kqv-0", 5) == 0){
+                //     FILE *f = fopen("mul_mat_cpu.txt", "a");
+                //     struct ggml_tensor* src0 =tensor->src[0];
+                //     struct ggml_tensor* src1 =tensor->src[1];
+                //     fprintf(f, "src0 type: %d\n", src0->type);
+                //     fprintf(f, "src1 type: %d\n", src1->type);
+                //     fprintf(f, "dst type: %d\n", tensor->type);
+                //     fprintf(f, "src0 name: %s\n", src0->name);
+                //     fprintf(f, "src1 name: %s\n", src1->name);
+                //     fprintf(f, "dst name: %s\n", tensor->name);
+                //     fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                //     fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+                //     fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);
+                //     fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+                //     fprintf(f, "src1 nb: %ld, %ld, %ld, %ld\n", src1->nb[0], src1->nb[1], src1->nb[2], src1->nb[3]);
+                //     fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+                //     fprintf(f, "src0 data: {");
+                //     for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //         fprintf(f, "%f ,", aclFloat16ToFloat(((aclFloat16*)src0->data)[i]));                    }
+                //         fprintf(f, "}\n \n");  
+                //     fprintf(f, "src1 data: {");
+                //     for(int i=0 ;i< src1->ne[0]* src1->ne[1]* src1->ne[2]* src1->ne[3]; i++){
+                //         fprintf(f, "%f ,", ((float*)src1->data)[i]);
+                //     }
+                //     fprintf(f, "}\n \n");
+                //     fprintf(f, "dst data: {");
+                //     for(int i=0 ;i< tensor->ne[0]* tensor->ne[1]* tensor->ne[2]* tensor->ne[3]; i++){
+                //         fprintf(f, "%f ,", ((float*)tensor->data)[i]);
+                //     }
+                //     fprintf(f, "}\n \n");  
+                //     fclose(f);
+                // }
             } break;
         case GGML_OP_MUL_MAT_ID:
             {
@@ -16605,11 +16733,82 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_CPY:
             {
+                // FILE *f = fopen("cpy_src_1.txt", "a");
+                // struct ggml_tensor* src0 =tensor->src[0];
+                // struct ggml_tensor* src1 =tensor->src[1];
+                // fprintf(f, "src0 type: %d\n", src0->type);
+                // fprintf(f, "src1 type: %d\n", src1->type);
+                // fprintf(f, "dst type: %d\n", tensor->type);
+                // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                // fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+                // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+                // fprintf(f, "src0 name: %s\n", src0->name);
+                // fprintf(f, "dst name: %s\n", tensor->name);
+                // fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+                // fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+                // fprintf(f, "src0 data: {");
+                // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //     fprintf(f, "%f ,", (double)((float*)src0->data)[i]);
+                // }
+                // fprintf(f, "}\n");
                 ggml_compute_forward_cpy(params, tensor);
+                // fprintf(f, "dst data: {");
+                // for(int i=0 ;i< tensor->ne[0]* tensor->ne[1]*tensor->ne[2]* tensor->ne[3]; i++){
+                //     aclFloat16 du = ((aclFloat16*)tensor->data)[i];
+                //     fprintf(f, "%f ,", (double)aclFloat16ToFloat(du));
+                // }
+                // for(int index3 = 0 ; index3 < tensor->ne[3] ; index3++){
+                //     for(int index2 = 0 ; index2 < tensor->ne[2] ; index2++){
+                //         for(int index1 = 0 ; index1 < tensor->ne[1] ; index1++){
+                //             for(int index0 = 0 ; index0 < tensor->ne[0] ; index0++){
+                //                 char * dst_ptr  = ((char *)  tensor->data + index0*tensor->nb[0]  + index1*tensor->nb[1]  + index2*tensor->nb[2]  + index3*tensor->nb[3]);
+                //                 fprintf(f, "%f ,", aclFloat16ToFloat(*((aclFloat16 *)dst_ptr)));   
+                //             }
+                //         }
+                //     }
+                // }
+                // fprintf(f, "}\n");
+                // fclose(f);
             } break;
         case GGML_OP_CONT:
             {
                 ggml_compute_forward_cont(params, tensor);
+                // if(strncmp(tensor->name, "kqv_merged_cont-0", 17) == 0){
+                //     FILE *f = fopen("cont_cpu.txt", "a");
+                //     struct ggml_tensor* src0 =tensor->src[0];
+                //     fprintf(f, "src0 type: %d\n", src0->type);
+                //     fprintf(f, "dst type: %d\n", tensor->type);
+                //     fprintf(f, "src0 name: %s\n", src0->name);
+                //     fprintf(f, "dst name: %s\n", tensor->name);
+                //     fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                //     fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);
+                //     fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+                //     fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+                //     fprintf(f, "src0 data: {");
+                //     for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //         fprintf(f, "%f ,", ((float*)src0->data)[i]);
+                //     }
+                //     fprintf(f, "}\n \n");
+                //     fprintf(f, "src0 data nb: {\n");
+                //     for(int index = 0, i3 = 0; i3 < src0->ne[3]; i3++) {
+                //         for(int i2 = 0; i2 < src0->ne[2]; i2++) {
+                //             for(int i1 = 0; i1 < src0->ne[1]; i1++) {
+                //                 for(int i0 = 0; i0 < src0->ne[0]; i0++) {
+                //                     fprintf(f, "%f\t,", ((float*)src0->data)[(i0*src0->nb[0] + i1*src0->nb[1] + i2*src0->nb[2] + i3*src0->nb[3])/sizeof(float)]);
+                //                     // fprintf(f, "src0 nb[%d]: %f\n", index++, ((float*)src0->data)[(i0*src0->nb[0] + i1*src0->nb[1] + i2*src0->nb[2] + i3*src0->nb[3])/sizeof(float)]);
+                //                 }
+                //             }
+                //         }
+                //     }
+                //     fprintf(f, "}\n \n");  
+                //     fprintf(f, "dst data: {\n");
+                //     for(int i=0 ;i< tensor->ne[0]* tensor->ne[1]* tensor->ne[2]* tensor->ne[3]; i++){
+                //         fprintf(f, "%f\t,", ((float*)tensor->data)[i]);
+                //         // fprintf(f, "dst[%d]: %f\n", i, ((float*)tensor->data)[i]);
+                //     }
+                //     fprintf(f, "}\n \n");  
+                //     fclose(f);
+                // }
             } break;
         case GGML_OP_RESHAPE:
             {
@@ -16622,6 +16821,29 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
         case GGML_OP_PERMUTE:
             {
                 ggml_compute_forward_permute(params, tensor);
+                // if(strncmp(tensor->name, "kqv_merged-0", 12) == 0){
+                //     FILE *f = fopen("permute_cpu.txt", "a");
+                //     struct ggml_tensor* src0 =tensor->src[0];
+                //     fprintf(f, "src0 type: %d\n", src0->type);
+                //     fprintf(f, "dst type: %d\n", tensor->type);
+                //     fprintf(f, "src0 name: %s\n", src0->name);
+                //     fprintf(f, "dst name: %s\n", tensor->name);
+                //     fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                //     fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);
+                //     fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+                //     fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+                //     fprintf(f, "src0 data: {");
+                //     for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //         fprintf(f, "%f ,", ((float*)src0->data)[i]);
+                //     }
+                //     fprintf(f, "}\n \n");  
+                //     fprintf(f, "dst data: {");
+                //     for(int i=0 ;i< tensor->ne[0]* tensor->ne[1]* tensor->ne[2]* tensor->ne[3]; i++){
+                //         fprintf(f, "%f ,", ((float*)tensor->data)[i]);
+                //     }
+                //     fprintf(f, "}\n \n");  
+                //     fclose(f);
+                // }
             } break;
         case GGML_OP_TRANSPOSE:
             {
@@ -16649,7 +16871,38 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_SOFT_MAX:
             {
+                // FILE *f = fopen("sm_cup.txt", "a");
+                // struct ggml_tensor* src0 =tensor->src[0];
+                // struct ggml_tensor* src1 =tensor->src[1];
+                // fprintf(f, "src0 type: %d\n", src0->type);
+                // fprintf(f, "src1 type: %d\n", src1->type);
+                // fprintf(f, "dst type: %d\n", tensor->type);
+                // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                // fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+                // fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+                // fprintf(f, "src1 nb: %ld, %ld, %ld, %ld\n", src1->nb[0], src1->nb[1], src1->nb[2], src1->nb[3]);
+                // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+                // fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+                // fprintf(f, "src0 name: %s\n", src0->name);
+                // fprintf(f, "src1 name: %s\n", src1->name);
+                // fprintf(f, "dst name: %s\n", tensor->name);
+                // fprintf(f, "src0 data: {");
+                // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //     fprintf(f, "%f ,", (double)((float*)src0->data)[i]);
+                // }
+                // fprintf(f, "}\n");
+                // fprintf(f, "src1 data: {");
+                // for(int i=0 ;i< src1->ne[0]* src1->ne[1]* src1->ne[2]* src1->ne[3]; i++){
+                //     fprintf(f, "%f ,", (double)((float*)src1->data)[i]);
+                // }
+                // fprintf(f, "}\n");
                 ggml_compute_forward_soft_max(params, tensor);
+                // fprintf(f, "dst data: {");
+                // for(int i=0 ;i< tensor->ne[0]* tensor->ne[1]* tensor->ne[2]* tensor->ne[3]; i++){
+                //     fprintf(f, "%f ,", ((float*)tensor->data)[i]);
+                // }
+                // fprintf(f, "}\n");
+                // fclose(f);
             } break;
         case GGML_OP_SOFT_MAX_BACK:
             {
@@ -16657,7 +16910,38 @@ static void ggml_compute_forward(struct ggml_compute_params * params, struct ggm
             } break;
         case GGML_OP_ROPE:
             {
+                // FILE *f = fopen("rope.txt", "a");
+                // struct ggml_tensor* src0 =tensor->src[0];
+                // struct ggml_tensor* src1 =tensor->src[1];
+                // fprintf(f, "src0 type: %d\n", src0->type);
+                // fprintf(f, "src1 type: %d\n", src1->type);
+                // fprintf(f, "dst type: %d\n", tensor->type);
+                // fprintf(f, "src0 ne: %ld, %ld, %ld, %ld\n", src0->ne[0], src0->ne[1], src0->ne[2], src0->ne[3]);
+                // fprintf(f, "src0 nb: %ld, %ld, %ld, %ld\n", src0->nb[0], src0->nb[1], src0->nb[2], src0->nb[3]);
+                // fprintf(f, "src1 ne: %ld, %ld, %ld, %ld\n", src1->ne[0], src1->ne[1], src1->ne[2], src1->ne[3]);
+                // fprintf(f, "src1 nb: %ld, %ld, %ld, %ld\n", src1->nb[0], src1->nb[1], src1->nb[2], src1->nb[3]);
+                // fprintf(f, "dst ne: %ld, %ld, %ld, %ld\n", tensor->ne[0], tensor->ne[1], tensor->ne[2], tensor->ne[3]);  
+                // fprintf(f, "dst nb: %ld, %ld, %ld, %ld\n", tensor->nb[0], tensor->nb[1], tensor->nb[2], tensor->nb[3]);
+                // fprintf(f, "src0 name: %s\n", src0->name);
+                // fprintf(f, "src1 name: %s\n", src1->name);
+                // fprintf(f, "dst name: %s\n", tensor->name);
+                // fprintf(f, "src0 data: {");
+                // for(int i=0 ;i< src0->ne[0]* src0->ne[1]* src0->ne[2]* src0->ne[3]; i++){
+                //     fprintf(f, "%f ,", (double)((float*)src0->data)[i]);
+                // }
+                // fprintf(f, "}\n");
+                // fprintf(f, "src1 data: {");
+                // for(int i=0 ;i< src1->ne[0]* src1->ne[1]* src1->ne[2]* src1->ne[3]; i++){
+                //     fprintf(f, "%f ,", (double)((float*)src1->data)[i]);
+                // }
+                // fprintf(f, "}\n");
                 ggml_compute_forward_rope(params, tensor);
+                // fprintf(f, "dst data: {");
+                // for(int i=0 ;i< tensor->ne[0]* tensor->ne[1]* tensor->ne[2]* tensor->ne[3]; i++){
+                //     fprintf(f, "%f ,", (double)((float*)tensor->data)[i]);
+                // }
+                // fprintf(f, "}\n");
+                // fclose(f);
             } break;
         case GGML_OP_ROPE_BACK:
             {
@@ -18639,6 +18923,7 @@ struct ggml_cplan ggml_graph_plan(const struct ggml_cgraph * cgraph, int n_threa
     }
 
     cplan.n_threads = MIN(max_tasks, n_threads);
+    // cplan.n_threads = 1;
     cplan.work_size = work_size;
     cplan.work_data = NULL;
 

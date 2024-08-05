@@ -11,7 +11,9 @@
 #  include "ggml-rpc.h"
 #endif
 
-#ifdef GGML_USE_CUDA
+#ifdef GGML_USE_ASCEND
+# include "ggml-ascend.h"
+#elif defined(GGML_USE_CUDA)
 #  include "ggml-cuda.h"
 #elif defined(GGML_USE_VULKAN)
 #  include "ggml-vulkan.h"
@@ -1947,7 +1949,11 @@ static std::string llama_token_to_piece(const struct llama_model * model, llama_
 static ggml_backend_buffer_type_t llama_default_buffer_type_cpu(bool host_buffer) {
     ggml_backend_buffer_type_t buft = nullptr;
 
-#if defined(GGML_USE_CUDA)
+#if defined(GGML_USE_ASCEND)
+    if (host_buffer) {
+        buft = ggml_backend_ascend_host_buffer_type();
+    }
+#elif defined(GGML_USE_CUDA)
     // host buffers should only be used when data is expected to be copied to/from the GPU
     if (host_buffer) {
         buft = ggml_backend_cuda_host_buffer_type();
@@ -1982,6 +1988,8 @@ struct llama_state {
         ggml_backend_metal_log_set_callback(log_callback, log_callback_user_data);
 #elif defined(GGML_USE_CUDA)
         ggml_backend_cuda_log_set_callback(log_callback, log_callback_user_data);
+#elif defined(GGML_USE_ASCEND)
+        ggml_backend_ascend_log_set_callback(log_callback, log_callback_user_data);
 #endif
     }
 
@@ -2632,7 +2640,10 @@ struct llama_context {
 
 static size_t llama_get_device_count(const llama_model & model) {
     size_t count = 1;
-#if defined(GGML_USE_CUDA)
+    //todo here
+#if defined(GGML_USE_ASCEND)
+    count = ggml_backend_ascend_get_device_count();
+#elif defined(GGML_USE_CUDA)
     count = ggml_backend_cuda_get_device_count();
 #elif defined(GGML_USE_SYCL)
     count = ggml_backend_sycl_get_device_count();
@@ -2661,6 +2672,8 @@ static ggml_backend_buffer_type_t llama_default_buffer_type_offload(const llama_
     buft = ggml_backend_metal_buffer_type();
 #elif defined(GGML_USE_CUDA)
     buft = ggml_backend_cuda_buffer_type(gpu);
+#elif defined(GGML_USE_ASCEND)
+    buft = ggml_backend_ascend_buffer_type(gpu);
 #elif defined(GGML_USE_VULKAN)
     buft = ggml_backend_vk_buffer_type(gpu);
 #elif defined(GGML_USE_SYCL)
@@ -2715,7 +2728,12 @@ static size_t llama_get_device_memory(const llama_model & model, int device) {
         return free;
     }
 #endif
-#if defined(GGML_USE_CUDA)
+#if defined(GGML_USE_ASCEND)
+    size_t total;
+    size_t free;
+    ggml_backend_ascend_get_device_memory(device, &free, &total);
+    return free;
+#elif defined(GGML_USE_CUDA)
     size_t total;
     size_t free;
     ggml_backend_cuda_get_device_memory(device, &free, &total);
@@ -3973,6 +3991,10 @@ struct llama_model_loader {
         std::vector<no_init<uint8_t>> read_buf;
         std::vector<std::future<std::pair<ggml_tensor *, bool>>> validation_result;
 
+// TODO!!!!!!!
+// #if defined(GGML_USE_ASCEND)
+    
+
 #if defined(GGML_USE_CUDA)
         // 4 staging buffers for async uploads, each sized 1MB seems to be a good default for single NVMe drives.
         // NVMe raid configurations might require more / larger buffers.
@@ -4042,7 +4064,7 @@ struct llama_model_loader {
 
                 GGML_ASSERT(buf_mmap || cur->data); // either we have a buffer to allocate the tensor in, or it is already allocated
                 if (buf_mmap && cur->data == nullptr) {
-                    ggml_backend_tensor_alloc(buf_mmap, cur, data);
+                    ggml_backend_tensor_alloc(buf_mmap, cur, data); // todo 
                     if (lmlocks) {
                         const auto & lmlock = lmlocks->at(weight->idx);
                         lmlock->grow_to(weight->offs + n_size);
@@ -4052,7 +4074,8 @@ struct llama_model_loader {
                     mmap_used.first  = std::min(mmap_used.first,  weight->offs);
                     mmap_used.second = std::max(mmap_used.second, weight->offs + n_size);
                 } else {
-                    ggml_backend_tensor_set(cur, data, 0, n_size);
+                    ggml_backend_tensor_set(cur, data, 0, n_size); // todo
+                    // printf("check p3\n");
                 }
             } else {
                 GGML_ASSERT(weight->idx < files.size());
@@ -5461,6 +5484,14 @@ static bool llm_load_tensors(
     // disable MoE with SYCL until mul_mat_id is updated
     if (hparams.n_expert > 0) {
         n_gpu_layers = 0;
+    }
+#endif
+
+#ifdef GGML_USE_ASCEND
+    auto init_res = ggml_backend_ascend_device_init();
+    if (!init_res) {
+        printf("Error While Init Ascend\n");
+        exit(1);
     }
 #endif
 
@@ -6936,6 +6967,7 @@ static bool llm_load_tensors(
         }
 #endif
         else {
+            // printf("check p1\n");
             ggml_backend_buffer_t buf = ggml_backend_alloc_ctx_tensors_from_buft(ctx, buft);
             if (buf == nullptr) {
                 throw std::runtime_error("unable to allocate backend buffer");
@@ -6990,7 +7022,7 @@ static bool llm_load_tensors(
             model.tensors_by_name.emplace_back(ggml_get_name(cur), cur);
         }
     }
-
+    // printf("check p2\n");
     // load tensor data
     for (auto & it : ctx_bufs) {
         ggml_context * ctx = it.first;
@@ -12708,7 +12740,7 @@ static void llama_graph_compute(
         ggml_backend_metal_set_n_cb(lctx.backend_metal, n_threads);
     }
 #endif
-
+    // printf("start graph compute\n");
     if (lctx.backend_cpu != nullptr) {
         ggml_backend_cpu_set_n_threads(lctx.backend_cpu, n_threads);
         ggml_backend_cpu_set_abort_callback(lctx.backend_cpu, lctx.abort_callback, lctx.abort_callback_data);
@@ -12718,9 +12750,9 @@ static void llama_graph_compute(
         ggml_backend_blas_set_n_threads(lctx.backend_blas, n_threads);
     }
 #endif
-
+    
     ggml_backend_sched_graph_compute_async(lctx.sched, gf);
-
+    // printf("return from graph compute");
     // fprintf(stderr, "splits: %d\n", ggml_backend_sched_get_n_splits(lctx.sched));
 }
 
@@ -17024,6 +17056,8 @@ struct llama_model_quantize_params llama_model_quantize_default_params() {
 size_t llama_max_devices(void) {
 #if defined(GGML_USE_RPC)
     return GGML_RPC_MAX_SERVERS;
+#elif defined(GGML_USE_ASCEND)
+    return GGML_ASCEND_MAX_DEVICES;
 #elif defined(GGML_USE_METAL)
     return 1;
 #elif defined(GGML_USE_CUDA)
@@ -17045,9 +17079,9 @@ bool llama_supports_mlock(void) {
     return llama_mlock::SUPPORTED;
 }
 
-bool llama_supports_gpu_offload(void) {
+bool llama_supports_gpu_offload(void) { // TODO
 #if defined(GGML_USE_CUDA) || defined(GGML_USE_METAL)   || defined(GGML_USE_VULKAN) || \
-    defined(GGML_USE_SYCL) || defined(GGML_USE_KOMPUTE) || defined(GGML_USE_RPC)
+    defined(GGML_USE_SYCL) || defined(GGML_USE_KOMPUTE) || defined(GGML_USE_RPC) || defined(GGML_USE_ASCEND)
     // Defined when llama.cpp is compiled with support for offloading model layers to GPU.
     return true;
 #else
@@ -17281,6 +17315,26 @@ struct llama_context * llama_new_context_with_model(
             }
             ctx->backends.push_back(ctx->backend_metal);
         }
+#elif defined(GGML_USE_ASCEND)
+        if (model->split_mode == LLAMA_SPLIT_MODE_NONE || model->split_mode == LLAMA_SPLIT_MODE_ROW) {
+            ggml_backend_t backend = ggml_backend_ascend_init(model->main_gpu);
+            if (backend == nullptr) {
+                LLAMA_LOG_ERROR("%s: failed to initialize ASCEND%d backend\n", __func__, model->main_gpu);
+                llama_free(ctx);
+                return nullptr;
+            }
+            ctx->backends.push_back(backend);
+        } else {
+            for (int device = 0; device < ggml_backend_ascend_get_device_count(); ++device) {
+                ggml_backend_t backend = ggml_backend_ascend_init(device);
+                if (backend == nullptr) {
+                    LLAMA_LOG_ERROR("%s: failed to initialize ASCEND%d backend \n", __func__, device);
+                    llama_free(ctx);
+                    return nullptr;
+                }
+                ctx->backends.push_back(backend);
+            }
+        }
 #elif defined(GGML_USE_CUDA)
         if (model->split_mode == LLAMA_SPLIT_MODE_NONE || model->split_mode == LLAMA_SPLIT_MODE_ROW) {
             // with split_mode LLAMA_SPLIT_MODE_NONE or LLAMA_SPLIT_MODE_ROW, only the main GPU backend is used
@@ -17460,7 +17514,7 @@ struct llama_context * llama_new_context_with_model(
             pipeline_parallel = false;
 #endif
             ctx->sched = ggml_backend_sched_new(ctx->backends.data(), backend_buft.data(), ctx->backends.size(), LLAMA_MAX_NODES, pipeline_parallel);
-
+            // printf("shed \n");
             if (pipeline_parallel) {
                 LLAMA_LOG_INFO("%s: pipeline parallelism enabled (n_copies=%d)\n", __func__, ggml_backend_sched_get_n_copies(ctx->sched));
             }
@@ -17470,13 +17524,14 @@ struct llama_context * llama_new_context_with_model(
             int n_past = cparams.n_ctx - n_tokens;
             llama_token token = llama_token_bos(&ctx->model); // not actually used by llama_build_graph, but required to choose between token and embedding inputs graph
             ggml_cgraph * gf = llama_build_graph(*ctx, llama_batch_get_one(&token, n_tokens, n_past, 0), true);
-
+            // printf("build graph\n");
             // initialize scheduler with the worst-case graph
             if (!ggml_backend_sched_reserve(ctx->sched, gf)) {
                 LLAMA_LOG_ERROR("%s: failed to allocate compute buffers\n", __func__);
                 llama_free(ctx);
                 return nullptr;
             }
+            // printf("reserve\n");
 
             for (size_t i = 0; i < ctx->backends.size(); i++) {
                 ggml_backend_t backend = ctx->backends[i];
@@ -17488,6 +17543,7 @@ struct llama_context * llama_new_context_with_model(
                             size / 1024.0 / 1024.0);
                 }
             }
+            // printf("buffer size\n");
 
             // note: the number of splits during measure is higher than during inference due to the kv shift
             int n_splits = ggml_backend_sched_get_n_splits(ctx->sched);
@@ -17495,7 +17551,7 @@ struct llama_context * llama_new_context_with_model(
             LLAMA_LOG_INFO("%s: graph splits = %d\n", __func__, n_splits);
         }
     }
-
+    // printf("return\n");
     return ctx;
 }
 
@@ -19033,7 +19089,6 @@ int32_t llama_decode(
     if (ret < 0) {
         LLAMA_LOG_ERROR("%s: failed to decode, ret = %d\n", __func__, ret);
     }
-
     return ret;
 }
 
@@ -19759,6 +19814,8 @@ void llama_log_set(ggml_log_callback log_callback, void * user_data) {
     ggml_backend_metal_log_set_callback(g_state.log_callback, g_state.log_callback_user_data);
 #elif defined(GGML_USE_CUDA)
     ggml_backend_cuda_log_set_callback(g_state.log_callback, g_state.log_callback_user_data);
+#elif defined(GGML_USE_ASCEND)
+    ggml_backend_ascend_log_set_callback(g_state.log_callback, g_state.log_callback_user_data);
 #endif
 }
 
