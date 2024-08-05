@@ -220,9 +220,12 @@ void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     std::vector<float> gammaHostData(src0->ne[0], 1);
     std::vector<float> rstdHostData = {1, float(src0->ne[0])};
 
-    int ret = data_addr_malloc(gammaShape, gammaHostData, &gammaDeviceAddr);
+    ggml_ascend_pool_alloc<char> gamma_allocator(ctx.pool(), GetShapeSize(gammaShape)* sizeof(float));
+    int ret = data_addr_malloc(gammaShape, gammaHostData, &gammaDeviceAddr, gamma_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rms_norm failed. ERROR: %d\n", ret); return);
-    ret = data_addr_malloc(rstdShape, rstdHostData, &rstdDeviceAddr);
+
+    ggml_ascend_pool_alloc<char> rstd_allocator(ctx.pool(), GetShapeSize(rstdShape)* sizeof(float));
+    ret = data_addr_malloc(rstdShape, rstdHostData, &rstdDeviceAddr, rstd_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rms_norm failed. ERROR: %d\n", ret); return);
 
     float eps;
@@ -234,8 +237,8 @@ void ggml_ascend_rms_norm(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
                                 eps, stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rms_norm failed. ERROR: %d\n", ret); return);
 
-    aclrtFree(gammaDeviceAddr);
-    aclrtFree(rstdDeviceAddr);
+    // aclrtFree(gammaDeviceAddr);
+    // aclrtFree(rstdDeviceAddr);
 }
 
 void ggml_ascend_rms_norm_new(ggml_backend_ascend_context & ctx, ggml_tensor * dst) {
@@ -329,8 +332,10 @@ void ggml_ascend_soft_max(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclnn_shape_t mulsSelfShape = {ne00, ne01, ne02, ne03};
     aclnn_shape_t mulsOutShape = mulsSelfShape;
     std::vector<float> mulsOutHostData(ne00 * ne01 * ne02 * ne03, 0);
-    auto ret = data_addr_malloc(mulsOutShape, mulsOutHostData, &mulsOutDeviceAddr);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_soft_max failed. ERROR: %d\n", ret); return);
+    // auto ret = data_addr_malloc(mulsOutShape, mulsOutHostData, &mulsOutDeviceAddr);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_soft_max failed. ERROR: %d\n", ret); return);
+    ggml_ascend_pool_alloc<char> muls_allocator(ctx.pool(), GetShapeSize(mulsOutShape)*sizeof(float));
+    auto ret = data_addr_malloc(mulsOutShape, mulsOutHostData, &mulsOutDeviceAddr, muls_allocator);
 
     ret = aclnn_muls_func(mulsSelfDeviceAddr, mulsOutDeviceAddr, mulsSelfShape, mulsOutShape, ACL_FLOAT, ACL_FLOAT, scale, stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_soft_max failed. ERROR: %d\n", ret); return);
@@ -357,7 +362,8 @@ void ggml_ascend_soft_max(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
         (addSelfShape[3] > addOtherShape[3]) ? addSelfShape[3] : addOtherShape[3]
     };
     std::vector<float> addOutHostData(addOutShape[0] * addOutShape[1] * addOutShape[2] * addOutShape[3], 0);
-    ret = data_addr_malloc(addOutShape, addOutHostData, &addOutDeviceAddr);
+    ggml_ascend_pool_alloc<char> add_allocator(ctx.pool(), GetShapeSize(addOutShape)* sizeof(float));
+    ret = data_addr_malloc(addOutShape, addOutHostData, &addOutDeviceAddr, add_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_soft_max failed. ERROR: %d\n", ret); return);
 
     ret = aclnn_add_func(addSelfDeviceAddr, addOtherDeviceAddr, addOutDeviceAddr,
@@ -386,8 +392,8 @@ void ggml_ascend_soft_max(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
                             stream);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_soft_max failed. ERROR: %d\n", ret); return);
 
-    aclrtFree(mulsOutDeviceAddr);
-    aclrtFree(addOutDeviceAddr);
+    // aclrtFree(mulsOutDeviceAddr);
+    // aclrtFree(addOutDeviceAddr);
 }
 
 void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, ggml_tensor *src1, ggml_tensor *dst) {
@@ -414,10 +420,12 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
     aclnn_shape_t permuteSelfShape = {ne03, ne02, ne01, ne00};
     aclnn_shape_t permuteOutShape = {ne03, ne02, ne00, ne01};
     aclnn_shape_t permuteDims = {0, 1, 3, 2};
-    int ret = addr_malloc(permuteOutShape, &permuteOutDeviceAddr, ggml_type_size_t[src0->type]);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+    // int ret = addr_malloc(permuteOutShape, &permuteOutDeviceAddr, ggml_type_size_t[src0->type], ctx);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+    ggml_ascend_pool_alloc<char> permute_allocator(ctx.pool(), GetShapeSize(permuteOutShape) * ggml_type_size_t[src0->type]);
+    permuteOutDeviceAddr = static_cast<void *>(permute_allocator.get());
 
-    ret = aclnn_permute_func(permuteSelfDeviceAddr, permuteOutDeviceAddr,
+    auto ret = aclnn_permute_func(permuteSelfDeviceAddr, permuteOutDeviceAddr,
                                 permuteSelfShape, permuteOutShape,
                                 ggml_to_acl_map[src0->type], ggml_to_acl_map[src0->type],
                                 permuteDims, stream);
@@ -436,8 +444,10 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
     void* cpySrcDeviceAddr = permuteOutDeviceAddr;
     aclnn_shape_t cpySelfRefShape = {ne03, ne02, ne00, ne01};
     aclnn_shape_t cpySrcShape = permuteOutShape;
-    ret = addr_malloc(cpySelfRefShape, &cpySelfRefDeviceAddr, ggml_type_size_t[src1->type]);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+    // ret = addr_malloc(cpySelfRefShape, &cpySelfRefDeviceAddr, ggml_type_size_t[src1->type], ctx);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+    ggml_ascend_pool_alloc<char> cpy_allocator(ctx.pool(), GetShapeSize(cpySelfRefShape) * ggml_type_size_t[src1->type]);
+    cpySelfRefDeviceAddr = static_cast<void *>(cpy_allocator.get());  
 
     ret = aclnn_cpy_func(cpySelfRefDeviceAddr, cpySrcDeviceAddr,
                         cpySelfRefShape, cpySrcShape,
@@ -447,8 +457,10 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
 
     void* boardcastSrc0DeviceAddr = nullptr;
     int64_t size = ne03 * ne12 * ne01 * ne00;
-    ret = aclrtMalloc(&boardcastSrc0DeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
-    CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+    // ret = aclrtMalloc(&boardcastSrc0DeviceAddr, size * sizeof(float), ACL_MEM_MALLOC_HUGE_FIRST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
+    ggml_ascend_pool_alloc<char> boradcast_allocator(ctx.pool(), size * sizeof(float));
+    boardcastSrc0DeviceAddr = static_cast<void *>(boradcast_allocator.get());
     for (int i = 0; i < size; i += ne02 * ne01 * ne00) {
         ret = aclrtMemcpy((void *)((float *)boardcastSrc0DeviceAddr + i), ne02 * ne01 * ne00 * sizeof(float), cpySelfRefDeviceAddr, ne02 * ne01 * ne00 * sizeof(float), ACL_MEMCPY_DEVICE_TO_DEVICE);
         CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
@@ -501,8 +513,8 @@ void ggml_ascend_mul_mat(ggml_backend_ascend_context &ctx, ggml_tensor *src0, gg
                                 stream);
 
     aclrtFree(permuteOutDeviceAddr);
-    aclrtFree(cpySelfRefDeviceAddr);
-    aclrtFree(boardcastSrc0DeviceAddr);
+    // aclrtFree(cpySelfRefDeviceAddr);
+    // aclrtFree(boardcastSrc0DeviceAddr);
 }
 
 static void aclnn_mat_mul(ggml_backend_ascend_context& ctx, aclTensor* acl_input,
@@ -608,9 +620,11 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     }
     void* powExpDeviceAddr = nullptr;
     void* powOutDeviceAddr = nullptr;
-    int ret = data_addr_malloc(powExpShape, powExpHostData, &powExpDeviceAddr);
+    ggml_ascend_pool_alloc<char> pow_exp_allocator(ctx.pool(), GetShapeSize(powExpShape) * sizeof(float));
+    int ret = data_addr_malloc(powExpShape, powExpHostData, &powExpDeviceAddr, pow_exp_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
-    ret = data_addr_malloc(powOutShape, powOutData, &powOutDeviceAddr);
+    ggml_ascend_pool_alloc<char> pow_out_allocator(ctx.pool(), GetShapeSize(powOutShape) * sizeof(float));
+    ret = data_addr_malloc(powOutShape, powOutData, &powOutDeviceAddr, pow_out_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
     ret = aclnn_pow_scalar_tensor_func(theta_scale, powExpDeviceAddr, powOutDeviceAddr,
@@ -662,7 +676,8 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     void* mulOutDeviceAddr = nullptr;
     void* mulSelfDeviceAddr = nullptr;
     std::vector<float> mulOutHostData(size, 0);
-    ret = data_addr_malloc(mulOutShape, mulOutHostData, &mulOutDeviceAddr);
+    ggml_ascend_pool_alloc<char> mul_out_allocator(ctx.pool(), GetShapeSize(mulOutShape) * sizeof(float));
+    ret = data_addr_malloc(mulOutShape, mulOutHostData, &mulOutDeviceAddr, mul_out_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
     // ret = aclrtMalloc(&mulSelfDeviceAddr, size * sizeof(int32_t), ACL_MEM_MALLOC_HUGE_FIRST);
@@ -714,7 +729,8 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclnn_shape_t mulsSelfShape = mulSelfShape;
     aclnn_shape_t mulsOutShape = mulOutShape;
     std::vector<float> mulsOutHostData(size, 0);
-    ret = data_addr_malloc(mulsOutShape, mulsOutHostData, &mulsOutDeviceAddr);
+    ggml_ascend_pool_alloc<char> muls_out_allocator(ctx.pool(), GetShapeSize(mulsOutShape) * sizeof(float));
+    ret = data_addr_malloc(mulsOutShape, mulsOutHostData, &mulsOutDeviceAddr, muls_out_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
     // std::vector<float> mulsSelfHostData(theta_base, theta_base+ size);
@@ -743,7 +759,8 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclnn_shape_t sinSelfShape = {size, 1};
     aclnn_shape_t sinOutShape = {size, 1};
     std::vector<float> sinOutHostData(size, 0);
-    ret = data_addr_malloc(sinOutShape, sinOutHostData, &sinOutDeviceAddr);
+    ggml_ascend_pool_alloc<char> sin_allocator(ctx.pool(), GetShapeSize(sinOutShape) * sizeof(float));
+    ret = data_addr_malloc(sinOutShape, sinOutHostData, &sinOutDeviceAddr, sin_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
 
     // std::vector<float> sinSelfHostData(theta, theta+ size);
@@ -773,7 +790,8 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclnn_shape_t cosSelfShape = {size, 1};
     aclnn_shape_t cosOutShape = {size, 1};
     std::vector<float> cosOutHostData(size, 0);
-    ret = data_addr_malloc(cosOutShape, cosOutHostData, &cosOutDeviceAddr);
+    ggml_ascend_pool_alloc<char> cos_allocator(ctx.pool(), GetShapeSize(cosOutShape) * sizeof(float));
+    ret = data_addr_malloc(cosOutShape, cosOutHostData, &cosOutDeviceAddr, cos_allocator);
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_rope failed. ERROR: %d\n", ret); return);
     // std::vector<float> cosSelfHostData(theta, theta+ size);
 
@@ -796,7 +814,9 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
     aclnn_shape_t permuteSelfShape = {1, size/ne[0], ne[0]/2, 2};
     aclnn_shape_t permuteOutShape = {1, size/ne[0], 2, ne[0]/2};
     aclnn_shape_t permuteDims = {0, 1, 3, 2};
-    ret = addr_malloc(permuteOutShape, &permuteOutDeviceAddr, ggml_type_size_t[src0->type]);
+    // ret = addr_malloc(permuteOutShape, &permuteOutDeviceAddr, ggml_type_size_t[src0->type], ctx);
+    ggml_ascend_pool_alloc<char> permute_allocator(ctx.pool(), GetShapeSize(permuteOutShape) *ggml_type_size_t[src0->type]);
+    permuteOutDeviceAddr = static_cast<void *>(permute_allocator.get());
     CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("ggml_ascend_mul_mat failed. ERROR: %d\n", ret); return);
 
     ret = aclnn_permute_func(permuteSelfDeviceAddr, permuteOutDeviceAddr,
@@ -834,13 +854,13 @@ void ggml_ascend_rope(ggml_backend_ascend_context &ctx, ggml_tensor *dst) {
                                 ggml_to_acl_map[src0->type], ggml_to_acl_map[src0->type],
                                 permuteDims1, stream);
 
-    aclrtFree(powExpDeviceAddr);
-    aclrtFree(powOutDeviceAddr);
+    // aclrtFree(powExpDeviceAddr);
+    // aclrtFree(powOutDeviceAddr);
     // aclrtFree(mulOtherDeviceAddr);
     // aclrtFree(mulSelfDeviceAddr);
-    aclrtFree(mulOutDeviceAddr);
-    aclrtFree(mulsOutDeviceAddr);
-    aclrtFree(sinOutDeviceAddr);
-    aclrtFree(cosOutDeviceAddr);
-    aclrtFree(permuteOutDeviceAddr);
+    // aclrtFree(mulOutDeviceAddr);
+    // aclrtFree(mulsOutDeviceAddr);
+    // aclrtFree(sinOutDeviceAddr);
+    // aclrtFree(cosOutDeviceAddr);
+    // aclrtFree(permuteOutDeviceAddr);
 }

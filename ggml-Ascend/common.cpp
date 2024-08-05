@@ -264,6 +264,22 @@ int64_t ggml_cann_get_mulmat_bcast_shape(
     return bcast_dim_cnt;
 }
 
+int addr_malloc(const aclnn_shape_t& shape, void** deviceAddr, size_t size_t, ggml_backend_ascend_context &ctx) {
+    auto size = GetShapeSize(shape) * size_t;
+    if(size <= 0){
+      return 0;
+    }
+    // 调用aclrtMalloc申请device侧内存
+    // auto ret = aclrtMalloc(deviceAddr, size, ACL_MEM_MALLOC_HUGE_FIRST);
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtMalloc failed. ERROR: %d\n", ret); return ret);
+    ggml_ascend_pool_alloc<char> device_allocator(ctx.pool(), size);
+    *deviceAddr = static_cast<void *>(device_allocator.get());
+    // auto ret = aclrtSynchronizeStream(ctx.stream());
+    // CHECK_RET(ret == ACL_SUCCESS, LOG_PRINT("aclrtSynchronizeStream failed. ERROR: %d\n", ret); return ret);
+
+    return 0;
+}
+
 int addr_malloc(const aclnn_shape_t& shape, void** deviceAddr, size_t size_t) {
     auto size = GetShapeSize(shape) * size_t;
     // 调用aclrtMalloc申请device侧内存
